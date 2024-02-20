@@ -31,7 +31,7 @@ class Parser:
     @staticmethod
     def initialize(reset=False):
         if reset: Parser._namespace.clear()
-        Parser._property['srepl'] = []
+        Parser._property['replace'] = []
         Parser._property['coord'] = CoordinateSystem('x')
         Parser._property['index'] = {chr(i): 3 for i in range(97, 123)}
         Parser._property['index'].update({i: 4 for i in [
@@ -44,21 +44,17 @@ class Parser:
         Parser._property['suffix'] = None
 
     def parse_latex(self, sentence):
-        """ Parse LaTeX Sentence
-
-            :arg:    latex sentence (raw string)
-            :return: namespace or expression
-        """
         # replace every substring marked 'ignore' with an empty string
         for ignore in self._property['ignore']:
             sentence = sentence.replace(ignore, '')
         # perform string replacement (aliasing) using namespace mapping
-        self.scanner.initialize('\n'.join(['srepl "%s" -> "%s"' % (old, new)
-            for (old, new) in self._property['srepl']] + [sentence]))
+        self.scanner.initialize('\n'.join(['replace "%s" -> "%s"' % (old, new)
+            for (old, new) in self._property['replace']] + [sentence]))
         self.scanner.lex()
-        for _ in self._property['srepl']:
-            self._srepl()
-        sentence = self.scanner.sentence[self.scanner.mark():]
+        for _ in self._property['replace']:
+            self._replace()
+        position, _ = self.scanner.prev_state
+        sentence = self.scanner.sentence[position:]
         stack = []; i = i_1 = i_2 = i_3 = 0
         while i < len(sentence):
             lexeme = sentence[i]
@@ -72,7 +68,7 @@ class Parser:
                 if lexeme == ',' and sentence[i - 1] == '{':
                     i_3 = sentence.find('}', i) + 1
                     subexpr, indexing = sentence[i_1:i_2], sentence[i_2:i_3][3:-1]
-                    indexing = reversed(re.findall(self.scanner.token_dict['LETTER'], indexing))
+                    indexing = reversed(re.findall(self.scanner.token_dict_eqn['CHARACTER'], indexing))
                     operator = ' '.join('\\partial_{' + index + '}' for index in indexing)
                     sentence = sentence.replace(sentence[i_1:i_3], operator + ' ' + subexpr)
                     i = i_1 + len(operator + ' ' + subexpr) - 1
@@ -80,18 +76,11 @@ class Parser:
                 elif lexeme == ';' and sentence[i - 1] == '{':
                     i_3 = sentence.find('}', i) + 1
                     subexpr, indexing = sentence[i_1:i_2], sentence[i_2:i_3][3:-1]
-                    indexing = reversed(re.findall(self.scanner.token_dict['LETTER'], indexing))
+                    indexing = reversed(re.findall(self.scanner.token_dict_eqn['CHARACTER'], indexing))
                     operator = ' '.join('\\nabla_{' + index + '}' for index in indexing)
                     sentence = sentence.replace(sentence[i_1:i_3], operator + ' ' + subexpr)
                     i = i_1 + len(operator + ' ' + subexpr) - 1
             i += 1
-        i = 0
-        # replace every comment (%%...\n) with an empty string
-        while i < len(sentence) - 1:
-            if sentence[i:(i + 2)] == '%%':
-                index = sentence.index('\n', i + 2)
-                sentence = sentence.replace(sentence[i:index], '')
-            else: i += 1
         self.scanner.initialize(sentence)
         self.scanner.lex()
         expression = self._latex()
@@ -99,24 +88,23 @@ class Parser:
             return expression
         return {symbol: self._namespace[symbol] for symbol in self.state}
 
-    # <LATEX> -> ( '%' <MACRO> | [ '%' ] <ASSIGNMENT> ) { ( '%' <MACRO> | [ '%' ] <ASSIGNMENT> ) }*
+    # <LATEX> -> ( '%' <CONFIG> | [ '%' ] <ASSIGNMENT> ) { ( '%' <CONFIG> | [ '%' ] <ASSIGNMENT> ) }*
     def _latex(self):
         count = 0
         while self.scanner.lexeme:
-            if self.accept('COMMENT'):
-                if any(self.peek(token) for token in ('DEFINE_MACRO', 'ASSIGN_MACRO',
-                        'IGNORE_MACRO', 'SREPL_MACRO', 'COORD_MACRO', 'INDEX_MACRO')):
-                    self._macro()
+            if self.accept('PERCENT'):
+                if any(self.peek(token) for token in ('DECLARE_CFG', 'ASSIGN_CFG', 'IGNORE_CFG', 'REPLACE_CFG')):
+                    self._config()
                 else: self._assignment()
             elif count > 0:
                 self._assignment()
             else:
-                if any(self.peek(token) for token in ('PAR_SYM', 'COV_SYM', 'LIE_SYM', 'DIACRITIC', 'SYMB_CMD')) \
-                        or (self.peek('LETTER') and self.scanner.lexeme != 'e'):
-                    marker = self.scanner.mark()
+                if any(self.peek(token) for token in ('PAR_SYM', 'COV_SYM', 'LIE_SYM', 'DIACRITIC', 'MULTISYMB')) \
+                        or (self.peek('CHARACTER') and self.scanner.lexeme != 'e'):
+                    prev_state = self.scanner.prev_state
                     self._operator('LHS')
                     assignment = self.accept('EQUAL')
-                    self.scanner.reset(marker)
+                    self.scanner.reset(prev_state)
                 else: assignment = False
                 if assignment:
                     self._assignment()
@@ -131,59 +119,58 @@ class Parser:
             count += 1
         return None
 
-    # <MACRO> -> <DEFINE> | <ASSIGN> | <IGNORE> | <SREPL> | <COORD> | <INDEX>
-    def _macro(self):
-        macro = self.scanner.lexeme
-        if self.peek('DEFINE_MACRO'):
-            self._define()
-        elif self.peek('ASSIGN_MACRO'):
-            self._assign()
-        elif self.peek('IGNORE_MACRO'):
+    # <CONFIG> -> <DECLARE> | <REPLACE> | <IGNORE> | <COORD> | <INDEX>
+    def _config(self):
+        prev_state = self.scanner.prev_state
+        config = self.scanner.lexeme
+        if self.accept('DECLARE_CFG'):
+            if self.peek('COORD_KWD'):
+                self._coord()
+            elif self.peek('INDEX_KWD'):
+                self._index()
+            elif self.peek('METRIC_OPT'):
+                self._metric()
+            else:
+                self.scanner.reset(prev_state)
+                self._declare()
+        elif self.peek('REPLACE_CFG'):
+            self._replace()
+        elif self.peek('IGNORE_CFG'):
             self._ignore()
-        elif self.peek('SREPL_MACRO'):
-            self._srepl()
-        elif self.peek('COORD_MACRO'):
-            self._coord()
-        elif self.peek('INDEX_MACRO'):
-            self._index()
         else:
-            sentence, position = self.scanner.sentence, self.scanner.mark()
-            raise ParserError('unsupported macro \'%s\' at position %d' %
-                (macro, position), sentence, position)
+            sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
+            raise ParserError('unsupported command \'%s\' at position %d' %
+                (config, position), sentence, position)
 
-    # <DEFINE> -> <DEFINE_MACRO> { <VARIABLE> }+ { '--' ( <CONST> | <ZEROS> | <OPTION> ) }*
-    def _define(self):
-        self.scanner.whitespace = True
-        self.expect('DEFINE_MACRO')
+    # <DECLARE> -> <DECLARE_CFG> { <IDENTIFIER> }+ { '--' ( <CONST_OPT> | <ZEROS_OPT> | <OPTION> ) }*
+    def _declare(self):
+        self.expect('DECLARE_CFG')
         symbols = []
         while True:
-            self.accept('WHITESPACE')
-            symbols.append(self._variable())
-            self.accept('WHITESPACE')
-            if self.peek('MINUS') or self.peek('LINEBREAK'): break
+            symbols.append(self.scanner.lexeme)
+            self.expect('IDENTIFIER')
+            if self.peek('LDASH') or self.peek('LINEBREAK'): break
         dimension = suffix = symmetry = metric = weight = None
         const = zeros = False
-        while self.accept('MINUS'):
-            self.expect('MINUS')
-            self.accept('WHITESPACE')
-            const = self.accept('CONST')
-            self.accept('WHITESPACE')
-            zeros = self.accept('ZEROS')
-            self.accept('WHITESPACE')
-            if not (const or zeros):
+        while self.accept('LDASH'):
+            if self.accept('CONST_OPT'):
+                const = True
+            elif self.accept('ZEROS_OPT'):
+                zeros = True
+            else:
                 option, value = self._option().split('<>')
                 if option == 'dimension':
                     dimension = int(value)
                 elif option == 'suffix':
-                    if suffix != 'none':
-                        suffix = value
+                    suffix = value
                 elif option == 'symmetry':
                     symmetry = value
                 elif option == 'metric':
                     metric = value
                 elif option == 'weight':
                     weight = value
-            self.accept('WHITESPACE')
+        # if not zeros and not suffix: # TODO
+        #     suffix = 'dD'
         for symbol in symbols:
             if const:
                 self._namespace[symbol] = Function('Constant')(Symbol(symbol, real=True))
@@ -193,175 +180,80 @@ class Parser:
                 tensor = IndexedSymbol(function, dimension, suffix=suffix, metric=metric, weight=weight)
                 tensor.symmetry = 'sym01' if symmetry == 'metric' else symmetry
                 self._define_tensor(tensor, zeros=zeros)
-                if symmetry == 'metric':
-                    diacritic = next(diacritic for diacritic in ('bar', 'hat', 'tilde', '') if diacritic in symbol)
-                    self._property['metric'][diacritic] = re.split(diacritic if diacritic else r'[UD]', symbol)[0]
-                    with self.scanner.new_context():
-                        self.scanner.whitespace = False
-                        self.accept('WHITESPACE')
-                        self.accept('LINEBREAK')
-                        self.parse_latex(Generator.generate_metric(symbol, dimension, diacritic, suffix))
-        self.scanner.whitespace = False
-        self.accept('WHITESPACE')
         self.accept('LINEBREAK')
 
-    # <ASSIGN> -> <ASSIGN_MACRO> { <VARIABLE> }+ { '--' <OPTION> }+
-    def _assign(self):
-        self.scanner.whitespace = True
-        self.expect('ASSIGN_MACRO')
-        symbols = []
-        while True:
-            self.accept('WHITESPACE')
-            symbols.append(self._variable())
-            self.accept('WHITESPACE')
-            if self.peek('MINUS') or self.peek('LINEBREAK'): break
-        dimension = suffix = symmetry = metric = weight = None
-        while self.accept('MINUS'):
-            self.expect('MINUS')
-            self.accept('WHITESPACE')
-            option, value = self._option().split('<>')
-            if option == 'dimension':
-                dimension = int(value)
-            elif option == 'suffix':
-                if suffix != 'none':
-                    suffix = value
-            elif option == 'symmetry':
-                symmetry = value
-            elif option == 'metric':
-                metric = value
-            elif option == 'weight':
-                weight = value
-            self.accept('WHITESPACE')
-        for symbol in symbols:
-            if symbol not in self._namespace:
-                raise IndexedSymbolError('cannot assign attribute(s) to undefined variable \'{symbol}\''.format(symbol=symbol))
-            tensor = self._namespace[symbol]
-            if dimension:
-                if tensor.rank > 0:
-                    raise IndexedSymbolError('cannot assign dimension to \'{symbol}\' since rank({symbol}) > 0'.format(symbol=symbol))
-                tensor.dimension = dimension
-            if suffix:
-                tensor.suffix = suffix
-            if symmetry:
-                tensor.symmetry = 'sym01' if symmetry == 'metric' else symmetry
-            if metric:
-                tensor.metric = metric
-            if weight:
-                tensor.weight = weight
-            if symmetry == 'metric':
-                if symbol not in self._namespace:
-                    raise IndexedSymbolError('cannot assign --metric to undefined variable \'{symbol}\''.format(symbol=symbol))
-                tensor = self._namespace[symbol]
-                if tensor.rank != 2:
-                    raise IndexedSymbolError('cannot assign --metric to \'{symbol}\' since rank({symbol}) != 2'.format(symbol=symbol))
-                structure = tensor.structure
-                for i in range(tensor.dimension):
-                    for j in range(tensor.dimension):
-                        if structure[i][j] == 0:
-                            structure[i][j] = structure[j][i]
-                        elif structure[j][i] == 0:
-                            structure[j][i] = structure[i][j]
-                        if structure[i][j] != structure[j][i]:
-                            raise IndexedSymbolError('cannot assign --metric to \'{symbol}\' since {symbol}[{i}][{j}] != {symbol}[{j}][{i}]'
-                                .format(symbol=symbol, i=i, j=j))
-                diacritic = next(diacritic for diacritic in ('bar', 'hat', 'tilde', '') if diacritic in symbol)
-                self._property['metric'][diacritic] = re.split(diacritic if diacritic else r'[UD]', symbol)[0]
-                with self.scanner.new_context():
-                    self.scanner.whitespace = False
-                    self.accept('WHITESPACE')
-                    self.accept('LINEBREAK')
-                    self.parse_latex(Generator.generate_metric(symbol, tensor.dimension, diacritic, tensor.suffix))
-            base_symbol = re.split(r'_d|_dup|_cd|_ld', symbol)[0]
-            if base_symbol and tensor.suffix:
-                rank = 0
-                for rank_symbol in re.split(r'_d|_dup|_cd|_ld', symbol):
-                    for character in reversed(rank_symbol):
-                        if character in ('U', 'D'):
-                            rank += 1
-                        else: break
-                if base_symbol in self._namespace:
-                    self._namespace[base_symbol].suffix = tensor.suffix
-                elif rank == 0:
-                    function = Function('Tensor')(Symbol(base_symbol, real=True))
-                    self._define_tensor(IndexedSymbol(function, suffix=tensor.suffix))
-        self.scanner.whitespace = False
-        self.accept('WHITESPACE')
-        self.accept('LINEBREAK')
-
-    # <IGNORE> -> <IGNORE_MACRO> { <STRING> }+
+    # <IGNORE> -> <IGNORE_CFG> { <STRING> }+
     def _ignore(self):
-        self.expect('IGNORE_MACRO')
+        self.expect('IGNORE_CFG')
         while True:
             string = self.scanner.lexeme[1:-1]
             if len(string) > 0 and string not in self._property['ignore']:
                 self._property['ignore'].append(string)
-            sentence, position = self.scanner.sentence, self.scanner.index
-            self.scanner.mark()
+            sentence, position = self.scanner.sentence, self.scanner.position
+            prev_state = self.scanner.prev_state
             self.expect('STRING')
             if len(string) > 0:
                 self.scanner.sentence = sentence[:position] + sentence[position:].replace(string, '')
             if not self.peek('STRING'): break
-        self.scanner.reset(); self.scanner.lex()
+        self.scanner.reset(prev_state)
+        self.scanner.lex()
+        self.accept('LINEBREAK')
 
-    # <SREPL> -> <SREPL_MACRO> <STRING> '->' <STRING> [ '--' <PERSIST> ]
-    def _srepl(self):
-        self.expect('SREPL_MACRO')
+    # <REPLACE> -> <REPLACE_CFG> <STRING> '->' <STRING>
+    def _replace(self):
+        self.expect('REPLACE_CFG')
         old = self.scanner.lexeme[1:-1]
         self.expect('STRING')
         self.expect('ARROW')
         new = self.scanner.lexeme[1:-1]
-        self.scanner.mark()
+        prev_state = self.scanner.prev_state
         self.expect('STRING')
-        persist = False
-        if self.accept('MINUS'):
-            self.expect('MINUS')
-            self.scanner.mark()
-            self.expect('PERSIST')
-            persist = True
-        if persist and [old, new] not in self._property['srepl']:
-            self._property['srepl'].append([old, new])
-        self.scanner.reset(); self.scanner.mark()
+        if [old, new] not in self._property['replace']:
+            self._property['replace'].append([old, new])
+        self.scanner.reset(prev_state)
+        prev_state = self.scanner.prev_state
         scanner = Scanner(); scanner.initialize(old)
         substr_syntax = []
         for token in scanner.tokenize():
             substr_syntax.append((scanner.lexeme, token))
         string_syntax = []
         for token in self.scanner.tokenize():
-            string_syntax.append((self.scanner.index, self.scanner.lexeme, token))
+            string_syntax.append((self.scanner.position, self.scanner.lexeme, token))
         sentence = self.scanner.sentence
         i_1 = i_2 = offset = 0
         for i, (index, lexeme, token) in enumerate(string_syntax):
-            if substr_syntax[0][0] == lexeme or substr_syntax[0][1] == 'GROUP' or token == 'SYMB_CMD':
+            if substr_syntax[0][0] == lexeme or substr_syntax[0][1] == 'GROUP': # or token == 'MULTISYMB':
                 k, index, varmap = i, index - len(lexeme), {}
                 for j, (_lexeme, _token) in enumerate(substr_syntax, start=i):
                     if k >= len(string_syntax): break
-                    if _token == 'LETTER' and string_syntax[k][2] == 'SYMB_CMD':
-                        letter_1 = _lexeme[1:] if len(_lexeme) > 1 else _lexeme
-                        letter_2, l = string_syntax[k + 2][1], 2
-                        while string_syntax[k + l + 1][2] != 'RBRACE':
-                            letter_2 += string_syntax[k + l + 1][1]
-                            l += 1
-                        if letter_1 != letter_2: break
-                        k += l + 1
-                    elif _token == 'GROUP':
+                    # if _token == 'CHARACTER' and string_syntax[k][2] == 'MULTISYMB':
+                    #     letter_1 = _lexeme[1:] if len(_lexeme) > 1 else _lexeme
+                    #     # letter_2, l = string_syntax[k + 2][1], 2
+                    #     # while string_syntax[k + l + 1][2] != 'RBRACE':
+                    #     #     letter_2 += string_syntax[k + l + 1][1]
+                    #     #     l += 1
+                    #     letter_2 = lexeme[8:-1]
+                    #     if letter_1 != letter_2: break
+                    #     # k += l + 1
+                    if _token == 'GROUP':
                         varmap[_lexeme] = string_syntax[k][1]
-                        if _lexeme[-2] == '.':
+                        if _lexeme[-1] == '*':
                             l, string = k + 1, varmap[_lexeme]
                             if l < len(string_syntax) and j - i + 1 < len(substr_syntax):
                                 EOL = substr_syntax[j - i + 1]
                                 while string_syntax[l][1] != EOL[0]:
-                                    if EOL[1] == 'LETTER' and string_syntax[l][2] == 'SYMB_CMD':
-                                        letter_1 = EOL[0][1:] if len(EOL[0]) > 1 else EOL[0]
-                                        letter_2, m = string_syntax[l + 2][1], 2
-                                        while string_syntax[l + m + 1][2] != 'RBRACE':
-                                            letter_2 += string_syntax[l + m + 1][1]
-                                            m += 1
-                                        if letter_1 == letter_2:
-                                            string_syntax[l + 1] = (string_syntax[l - 1][0], EOL[0], EOL[1])
-                                        else:
-                                            string += '\\mathrm{' + letter_2 + '}'
-                                            l += m + 1
-                                    else: string += string_syntax[l][1]
+                                    # if EOL[1] == 'CHARACTER' and string_syntax[l][2] == 'MULTISYMB':
+                                    #     letter_1 = EOL[0][1:] if len(EOL[0]) > 1 else EOL[0]
+                                    #     letter_2, m = string_syntax[l + 2][1], 2
+                                    #     while string_syntax[l + m + 1][2] != 'RBRACE':
+                                    #         letter_2 += string_syntax[l + m + 1][1]
+                                    #         m += 1
+                                    #     if letter_1 == letter_2:
+                                    #         string_syntax[l + 1] = (string_syntax[l - 1][0], EOL[0], EOL[1])
+                                    #     else:
+                                    #         string += '\\mathrm{' + letter_2 + '}'
+                                    #         l += m + 1
+                                    string += string_syntax[l][1]
                                     if l + 1 >= len(string_syntax): break
                                     l += 1
                                 else:
@@ -377,114 +269,148 @@ class Parser:
                         offset += len(new_repl) - len(old_repl)
                     k += 1
         self.scanner.sentence = sentence
-        self.scanner.reset(); self.scanner.lex()
+        # print(sentence)
+        self.scanner.reset(prev_state)
+        self.scanner.lex()
+        self.accept('LINEBREAK')
 
-    # <COORD> -> <COORD_MACRO> ( '[' <SYMBOL> [ ',' <SYMBOL> ]* ']' | '--' <DEFAULT> )
+    # <COORD> -> <COORD_KWD> { <IDENTIFIER> }*
     def _coord(self):
-        self.expect('COORD_MACRO')
-        if self.accept('MINUS'):
-            self.expect('MINUS')
-            self.expect('DEFAULT')
-            self._property['coord'] = CoordinateSystem('x')
-        else:
-            self.expect('LBRACK')
-            del self._property['coord'][:]
+        self.expect('COORD_KWD')
+        del self._property['coord'][:]
+        if self.peek('IDENTIFIER'):
             while True:
-                symbol = self._strip(self._symbol())
+                sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
+                variable = self.scanner.lexeme
+                self.expect('IDENTIFIER')
+                symbol = Symbol(variable, real=True)
                 if symbol in self._property['coord']:
-                    sentence, position = self.scanner.sentence, self.scanner.mark()
-                    raise ParserError('duplicate coord symbol \'%s\' at position %d' %
+                    raise ParserError('duplicate coordinate symbol \'%s\' at position %d' %
                         (sentence[position], position), sentence, position)
-                self._property['coord'].append(Symbol(symbol, real=True))
-                if not self.accept('COMMA'): break
-            self.expect('RBRACK')
-
-    # <INDEX> -> <INDEX_MACRO> [ { <LETTER> | '[' <LETTER> '-' <LETTER> ']' }+ | '--' <DEFAULT> ] '--' <DIM> <INTEGER>
-    def _index(self):
-        self.expect('INDEX_MACRO')
-        indices = []
-        if self.accept('MINUS'):
-            self.expect('MINUS')
-            self.expect('DEFAULT')
-            indices.extend([index for index in self._property['index']])
+                self._property['coord'].append(symbol)
+                if self.peek('LINEBREAK'): break
         else:
+            self._property['coord'] = CoordinateSystem('x')
+        self.accept('LINEBREAK')
+
+    # <INDEX> -> <INDEX_KWD> { <CHARACTER> [ '..' <CHARACTER> ] }* '--' <DIM_OPT> <INTEGER>
+    def _index(self):
+        self.expect('INDEX_KWD')
+        indices = []
+        if self.peek('IDENTIFIER'):
             while True:
-                sentence, position = self.scanner.sentence, self.scanner.mark()
-                if self.accept('LBRACK'):
-                    index_1 = self._strip(self.scanner.lexeme)
-                    self.expect('LETTER')
-                    self.expect('MINUS')
-                    index_2 = self._strip(self.scanner.lexeme)
-                    self.expect('LETTER')
-                    if len(index_1) > 1 or len(index_2) > 1:
+                sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
+                index_1 = self.scanner.lexeme
+                self.expect('IDENTIFIER')
+                if self.accept('LDOTS'):
+                    index_2 = self.scanner.lexeme
+                    self.expect('IDENTIFIER')
+                    try:
+                        indices.extend([chr(i) for i in range(ord(index_1), ord(index_2) + 1)])
+                    except TypeError:
                         raise ParserError('unsupported index range \'%s\' at position %d' %
-                            (sentence[position:self.scanner.index], position), sentence, position)
-                    indices.extend([chr(i) for i in range(ord(index_1), ord(index_2) + 1)])
-                    self.expect('RBRACK')
-                elif self.peek('LETTER'):
-                    indices.append(self._strip(self.scanner.lexeme))
-                    self.expect('LETTER')
-                if self.peek('MINUS'): break
-        self.expect('MINUS')
-        self.expect('MINUS')
-        self.expect('DIM')
+                            (sentence[position:self.scanner.position], position), sentence, position)
+                else:
+                    indices.append(index_1)
+                if self.peek('LDASH'): break
+        else:
+            indices.extend([index for index in self._property['index']])
+        self.expect('LDASH')
+        self.expect('DIM_OPT')
         dimension = self.scanner.lexeme
         self.expect('INTEGER')
         dimension = int(dimension)
-        if self.accept('MINUS'):
-            self.expect('MINUS')
-            self.expect('DEFAULT')
-            indices = [index for index in self._property['index']]
         self._property['index'].update({index: dimension for index in indices})
+        self.accept('LINEBREAK')
 
-    # <OPTION> -> <DIM> <INTEGER> | <SYM> <SYMMETRY> | <WEIGHT> <NUMBER> | <SUFFIX> <VARIABLE> | <METRIC> [ <VARIABLE> ]
+    # <METRIC> -> <METRIC_OPT> { <IDENTIFIER> }+ { '--' ( <ZEROS_OPT> | <DIM_OPT> <INTEGER> | <SUFFIX_OPT> <IDENTIFIER> ) }*
+    def _metric(self):
+        self.expect('METRIC_OPT')
+        symbols = []
+        while True:
+            symbols.append(self.scanner.lexeme)
+            self.expect('IDENTIFIER')
+            if self.peek('LDASH') or self.peek('LINEBREAK'): break
+        dimension = suffix = None
+        zeros = False
+        while self.accept('LDASH'):
+            if self.accept('ZEROS_OPT'):
+                zeros = True
+            elif self.accept('DIM_OPT'):
+                option = self.scanner.lexeme
+                self.expect('INTEGER')
+                dimension = int(option)
+            elif self.accept('SUFFIX_OPT'):
+                option = self.scanner.lexeme
+                self.expect('IDENTIFIER')
+                suffix = option
+            else:
+                sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
+                raise ParserError('unexpected \'%s\' at position %d' %
+                    (sentence[position], position), sentence, position)
+        # if not zeros and not suffix: # TODO
+        #     suffix = 'dD'
+        if dimension is None:
+            sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
+            raise ParserError('cannot declare metric without specifying a dimension.', sentence, position)
+        for symbol in symbols:
+            function = Function('Tensor')(Symbol(symbol, real=True))
+            tensor = IndexedSymbol(function, dimension, suffix=suffix)
+            tensor.symmetry = 'sym01'
+            self._define_tensor(tensor, zeros=zeros)
+            diacritic = next(diacritic for diacritic in ('bar', 'hat', 'tilde', '') if diacritic in symbol)
+            self._property['metric'][diacritic] = re.split(diacritic if diacritic else r'[UD]', symbol)[0]
+            # with self.scanner.context():
+            #     self.accept('LINEBREAK')
+            #     self.parse_latex(Generator.generate_metric(symbol, dimension, diacritic, suffix))
+        self.accept('LINEBREAK')
+
+    # <OPTION> -> <DIM_OPT> <INTEGER> | <SYM_OPT> <SYMMETRY> | <WEIGHT_OPT> <NUMBER> | <SUFFIX_OPT> <IDENTIFIER> | <METRIC_OPT> <IDENTIFIER>
     def _option(self):
-        if self.accept('DIM'):
-            self.accept('WHITESPACE')
+        if self.accept('DIM_OPT'):
             dimension = self.scanner.lexeme
             self.expect('INTEGER')
             return 'dimension<>' + dimension
-        if self.accept('SYM'):
-            self.accept('WHITESPACE')
+        if self.accept('SYM_OPT'):
             symmetry = self.scanner.lexeme
             self.expect('SYMMETRY')
             return 'symmetry<>' + symmetry
-        if self.accept('WEIGHT'):
-            self.accept('WHITESPACE')
+        if self.accept('WEIGHT_OPT'):
             weight = self._number()
             return 'weight<>' + str(weight)
-        if self.accept('SUFFIX'):
-            self.accept('WHITESPACE')
-            sentence, position = self.scanner.sentence, self.scanner.mark()
-            suffix = self._variable()
+        if self.accept('SUFFIX_OPT'):
+            sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
+            suffix = self.scanner.lexeme
+            self.expect('IDENTIFIER')
             if suffix[0] != 'd' or suffix[-1] != 'D':
                 raise ParserError('unsupported suffix \'%s\' at position %d' %
                     (suffix, position), sentence, position)
             return 'suffix<>' + suffix
-        if self.accept('METRIC'):
-            self.accept('WHITESPACE')
-            if self.peek('LETTER'):
-                metric = self._variable()
-                return 'metric<>' + metric
-            return 'symmetry<>metric'
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        if self.accept('METRIC_OPT'):
+            metric = self.scanner.lexeme
+            self.expect('IDENTIFIER')
+            return 'metric<>' + metric
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         raise ParserError('unexpected \'%s\' at position %d' %
             (sentence[position], position), sentence, position)
 
-    # <ASSIGNMENT> -> <OPERATOR> = <EXPRESSION> [ '\\' ] [ '%' <NOIMPSUM> ]
+    # <ASSIGNMENT> -> <OPERATOR> = <EXPRESSION> [ '\\' ] [ '%' (<METRIC_KWD> | <NOIMPSUM_KWD>) ]
     def _assignment(self):
         function = self._operator('LHS')
         indexed = function.func == Function('Tensor') and len(function.args) > 1
         self.expect('EQUAL')
-        sentence, position_1 = self.scanner.sentence, self.scanner.mark()
+        sentence, (position_1, _) = self.scanner.sentence, self.scanner.prev_state
         tree = ExprTree(self._expression())
         self.accept('NEWLINE')
-        position_2 = self.scanner.mark()
-        impsum = True
-        if self.accept('COMMENT'):
-            if self.accept('NOIMPSUM'):
+        prev_state = self.scanner.prev_state
+        position_2, _ = prev_state
+        metric, impsum = False, True
+        if self.accept('PERCENT'):
+            if self.accept('METRIC_KWD'):
+                metric = True
+            elif self.accept('NOIMPSUM_KWD'):
                 impsum = False
-            else: self.scanner.reset()
+            else: self.scanner.reset(prev_state)
         equation = ((IndexedSymbol.latex_format(function), sentence[position_1:position_2]), tree.root.expr)
         if self._property['debug']:
             (latex_LHS, latex_RHS), expr_RHS = equation
@@ -499,15 +425,21 @@ class Parser:
                 if subexpr.func == Function('Tensor') and rank > 1:
                     indexed = True
         LHS, RHS = function, expand(tree.root.expr) if indexed else tree.root.expr
-        global_env, dimension = self.generator.generate(LHS, RHS, impsum)
         symbol, indices = str(function.args[0]), function.args[1:]
+        # in_namespace = symbol in self._namespace
+        global_env, dimension = self.generator.generate(LHS, RHS, impsum)
         if any(isinstance(index, Integer) for index in indices):
             tensor = self._namespace[symbol]
             tensor.structure = global_env[symbol]
         else:
             suffix = self._namespace[symbol].suffix if symbol in self._namespace else None
+            # if not suffix and not in_namespace: # TODO
+            #     suffix = 'dD'
             tensor = IndexedSymbol(function, dimension, structure=global_env[symbol],
                 equation=equation, suffix=suffix, impsum=impsum)
+        if metric:
+            diacritic = next(diacritic for diacritic in ('bar', 'hat', 'tilde', '') if diacritic in symbol)
+            self._property['metric'][diacritic] = re.split(diacritic if diacritic else r'[UD]', symbol)[0]
         self._namespace[symbol] = tensor
         self.state[symbol] = None
 
@@ -525,20 +457,20 @@ class Parser:
     def _term(self):
         expr = self._factor()
         while any(self.peek(token) for token in ('DIVIDE',
-                'RATIONAL', 'DECIMAL', 'INTEGER', 'PI', 'PAR_SYM', 'COV_SYM', 'LIE_SYM',
-                'SYMB_CMD', 'FUNC_CMD', 'FRAC_CMD', 'SQRT_CMD', 'NLOG_CMD', 'TRIG_CMD',
-                'LPAREN', 'LBRACK', 'DIACRITIC', 'LETTER', 'COMMAND', 'COMMENT', 'BACKSLASH')):
-            self.scanner.mark()
-            if self.accept('COMMENT'):
-                if not self.peek('SUFFIX'):
-                    self.scanner.reset()
+                'RATIONAL', 'DECIMAL', 'INTEGER', 'CONSTANT', 'PAR_SYM', 'COV_SYM', 'LIE_SYM',
+                'MULTISYMB', 'EXP_CMD', 'LOG_CMD', 'FRAC_CMD', 'SQRT_CMD', 'TRIG_CMD',
+                'LPAREN', 'LBRACK', 'LBRACE_ESC', 'DIACRITIC', 'CHARACTER', 'COMMAND', 'PERCENT')):
+            prev_state = self.scanner.prev_state
+            if self.accept('PERCENT'):
+                if not self.peek('SUFFIX_KWD'):
+                    self.scanner.reset(prev_state)
                     return expr
-                self.scanner.reset()
-            if self.accept('BACKSLASH'):
-                if self.peek('RBRACE'):
-                    self.scanner.reset()
-                    return expr
-                self.scanner.reset()
+                self.scanner.reset(prev_state)
+            # if self.accept('BACKSLASH'):
+            #     if self.peek('RBRACE'):
+            #         self.scanner.reset(prev_state)
+            #         return expr
+            #     self.scanner.reset(prev_state)
             if self.accept('DIVIDE'):
                 expr /= self._factor()
             else: expr *= self._factor()
@@ -563,16 +495,16 @@ class Parser:
 
     # <BASE> -> <BASE> -> <NUMBER> | <COMMAND> | <OPERATOR> | <SUBEXPR>
     def _base(self):
-        if self.peek('LETTER') or self.peek('SYMB_CMD'):
-            self.scanner.mark()
+        if self.peek('CHARACTER') or self.peek('MULTISYMB'):
+            prev_state = self.scanner.prev_state
             symbol = self._strip(self._symbol())
             if symbol in ('epsilon', 'Gamma', 'D'):
-                self.scanner.reset()
+                self.scanner.reset(prev_state)
                 return self._operator()
             if symbol in self._namespace:
                 variable = self._namespace[symbol]
                 if isinstance(variable, IndexedSymbol) and variable.rank > 0:
-                    self.scanner.reset()
+                    self.scanner.reset(prev_state)
                     return self._operator()
             for key in self._namespace:
                 base_symbol = key
@@ -581,7 +513,7 @@ class Parser:
                         base_symbol = base_symbol[:len(base_symbol) - i]; break
                 if isinstance(self._namespace[key], IndexedSymbol) and symbol == base_symbol \
                         and self._namespace[key].rank > 0:
-                    self.scanner.reset()
+                    self.scanner.reset(prev_state)
                     return self._operator()
             if self.peek('CARET'):
                 function = Function('Tensor')(Symbol(symbol, real=True))
@@ -591,20 +523,20 @@ class Parser:
                 else:
                     self._define_tensor(IndexedSymbol(function))
                 return function
-            self.scanner.reset()
+            self.scanner.reset(prev_state)
             return self._operator()
         if any(self.peek(token) for token in
-                ('RATIONAL', 'DECIMAL', 'INTEGER', 'PI')):
+                ('RATIONAL', 'DECIMAL', 'INTEGER', 'CONSTANT')):
             return self._number()
         if any(self.peek(token) for token in
-                ('FUNC_CMD', 'FRAC_CMD', 'SQRT_CMD', 'NLOG_CMD', 'TRIG_CMD', 'COMMAND')):
+                ('EXP_CMD', 'LOG_CMD', 'FRAC_CMD', 'SQRT_CMD', 'TRIG_CMD', 'COMMAND')):
             return self._command()
         if any(self.peek(token) for token in
-                ('PAR_SYM', 'COV_SYM', 'LIE_SYM', 'COMMENT', 'DIACRITIC')):
+                ('PAR_SYM', 'COV_SYM', 'LIE_SYM', 'PERCENT', 'DIACRITIC')):
             return self._operator()
-        if any(self.peek(i) for i in ('LPAREN', 'LBRACK', 'BACKSLASH')):
+        if any(self.peek(i) for i in ('LPAREN', 'LBRACK', 'LBRACE_ESC')):
             return self._subexpr()
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         raise ParserError('unexpected \'%s\' at position %d' %
             (sentence[position], position), sentence, position)
 
@@ -627,46 +559,63 @@ class Parser:
         elif self.accept('LBRACK'):
             expr = self._expression()
             self.expect('RBRACK')
-        elif self.accept('BACKSLASH'):
-            self.expect('LBRACE')
+        elif self.accept('LBRACE_ESC'):
             expr = self._expression()
-            self.expect('BACKSLASH')
-            self.expect('RBRACE')
+            self.expect('RBRACE_ESC')
         else:
-            sentence, position = self.scanner.sentence, self.scanner.mark()
+            sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
             raise ParserError('unexpected \'%s\' at position %d' %
                 (sentence[position], position), sentence, position)
         return expr
 
-    # <COMMAND> -> <FUNC> | <FRAC> | <SQRT> | <NLOG> | <TRIG>
+    # <COMMAND> -> <EXP> | <LOG> | <FRAC> | <SQRT> | <TRIG>
     def _command(self):
         command = self.scanner.lexeme
-        if self.peek('FUNC_CMD'):
-            return self._func()
+        if self.peek('EXP_CMD'):
+            return self._exp()
+        if self.peek('LOG_CMD'):
+            return self._log()
         if self.peek('FRAC_CMD'):
             return self._frac()
         if self.peek('SQRT_CMD'):
             return self._sqrt()
-        if self.peek('NLOG_CMD'):
-            return self._nlog()
         if self.peek('TRIG_CMD'):
             return self._trig()
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         raise ParserError('unsupported command \'%s\' at position %d' %
             (command, position), sentence, position)
 
-    # <FUNC> -> <FUNC_CMD> '{' <EXPRESSION> '}'
-    def _func(self):
+    # <EXP> -> <EXP_CMD> '{' <EXPRESSION> '}'
+    def _exp(self):
         func = self._strip(self.scanner.lexeme)
-        self.expect('FUNC_CMD')
+        self.expect('EXP_CMD')
         self.expect('LBRACE')
         expr = self._expression()
         self.expect('RBRACE')
         if func == 'exp':
             return exp(expr)
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         raise ParserError('unsupported function \'%s\' at position %d' %
             (func, position), sentence, position)
+
+    # <LOG> -> <LOG_CMD> [ '_' ( <NUMBER> | '{' <NUMBER> '}' ) ] '{' <EXPRESSION> '}'
+    def _log(self):
+        func = self._strip(self.scanner.lexeme)
+        self.expect('LOG_CMD')
+        if func == 'log':
+            if self.accept('UNDERSCORE'):
+                if self.accept('LBRACE'):
+                    base = self._number()
+                    self.expect('RBRACE')
+                else:
+                    base = self._number()
+                base = int(base)
+            else: base = 10
+        self.expect('LBRACE')
+        expr = self._expression()
+        self.expect('RBRACE')
+        if func == 'ln': return log(expr)
+        return log(expr, base)
 
     # <FRAC> -> <FRAC_CMD> '{' <EXPRESSION> '}' '{' <EXPRESSION> '}'
     def _frac(self):
@@ -695,25 +644,6 @@ class Parser:
             return sqrt(expr)
         return Pow(expr, root)
 
-    # <NLOG> -> <NLOG_CMD> [ '_' ( <NUMBER> | '{' <NUMBER> '}' ) ] '{' <EXPRESSION> '}'
-    def _nlog(self):
-        func = self._strip(self.scanner.lexeme)
-        self.expect('NLOG_CMD')
-        if func == 'log':
-            if self.accept('UNDERSCORE'):
-                if self.accept('LBRACE'):
-                    base = self._number()
-                    self.expect('RBRACE')
-                else:
-                    base = self._number()
-                base = int(base)
-            else: base = 10
-        self.expect('LBRACE')
-        expr = self._expression()
-        self.expect('RBRACE')
-        if func == 'ln': return log(expr)
-        return log(expr, base)
-
     # <TRIG> -> <TRIG_CMD> [ '^' ( <NUMBER> | '{' <NUMBER> '}' ) ] '{' <EXPRESSION> '}'
     def _trig(self):
         func = self._strip(self.scanner.lexeme)
@@ -738,12 +668,15 @@ class Parser:
         if exponent == -1: return trig(expr)
         return trig(expr) ** exponent
 
-    # <OPERATOR> -> [ '%' <SUFFIX> <VARIABLE> ] ( <PARDRV> | <COVDRV> | <LIEDRV> | <TENSOR> )
+    # <OPERATOR> -> [ '%' <SUFFIX_KWD> <IDENTIFIER> ] ( <PARDRV> | <COVDRV> | <LIEDRV> | <TENSOR> )
     def _operator(self, location='RHS'):
         global_suffix = self._property['suffix']
-        if self.accept('COMMENT'):
-            self.expect('SUFFIX')
-            suffix = self._variable()
+        if self.accept('PERCENT'):
+            self.scanner.eqn_mode = False
+            self.expect('SUFFIX_KWD')
+            suffix = self.scanner.lexeme
+            self.expect('IDENTIFIER')
+            self.expect('LINEBREAK')
             self._property['suffix'] = suffix
         if not global_suffix and location == 'LHS':
             self._property['suffix'] = 'dD'
@@ -753,16 +686,16 @@ class Parser:
             self._property['suffix'] = global_suffix
             return pardrv
         if self.peek('COV_SYM') or self.peek('DIACRITIC') or \
-                (self.peek('LETTER') and self.scanner.lexeme == 'D'):
-            self.scanner.mark()
+                (self.peek('CHARACTER') and self.scanner.lexeme == 'D'):
+            prev_state = self.scanner.prev_state
             if self.accept('DIACRITIC'):
                 self.expect('LBRACE')
-                if self.peek('COV_SYM') or (self.peek('LETTER') and self.scanner.lexeme == 'D'):
-                    self.scanner.reset()
+                if self.peek('COV_SYM') or (self.peek('CHARACTER') and self.scanner.lexeme == 'D'):
+                    self.scanner.reset(prev_state)
                     covdrv = self._covdrv(location)
                     self._property['suffix'] = global_suffix
                     return covdrv
-                self.scanner.reset()
+                self.scanner.reset(prev_state)
             else:
                 covdrv = self._covdrv(location)
                 self._property['suffix'] = global_suffix
@@ -771,11 +704,11 @@ class Parser:
             liedrv = self._liedrv(location)
             self._property['suffix'] = global_suffix
             return liedrv
-        if any(self.peek(token) for token in ('LETTER', 'DIACRITIC', 'SYMB_CMD')):
+        if any(self.peek(token) for token in ('CHARACTER', 'DIACRITIC', 'MULTISYMB')):
             tensor = self._tensor(location)
             self._property['suffix'] = global_suffix
             return tensor
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         raise ParserError('unsupported operator \'%s\' at position %d' %
             (operator, position), sentence, position)
 
@@ -783,7 +716,7 @@ class Parser:
     def _pardrv(self, location='RHS'):
         self.expect('PAR_SYM')
         self.expect('UNDERSCORE')
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         index = self._indexing_2()
         if any(self.peek(i) for i in ('LPAREN', 'LBRACK', 'LBRACE')):
             subexpr = self._subexpr()
@@ -834,19 +767,19 @@ class Parser:
 
     # <COVDRV> -> ( <COV_SYM> | <DIACRITIC> '{' <COV_SYM> '}' ) ( '^' | '_' ) <INDEXING_2> ( <OPERATOR> | <SUBEXPR> )
     def _covdrv(self, location='RHS'):
-        diacritic, position = '', self.scanner.mark()
+        diacritic, (position, _) = '', self.scanner.prev_state
         if self.peek('DIACRITIC'):
             diacritic = self._strip(self.scanner.lexeme)
             self.expect('DIACRITIC')
             operator = '\\' + diacritic + '{\\nabla}'
             self.expect('LBRACE')
-            if self.peek('LETTER') and self.scanner.lexeme == 'D':
+            if self.peek('CHARACTER') and self.scanner.lexeme == 'D':
                 self.scanner.lex()
             else: self.expect('COV_SYM')
             self.expect('RBRACE')
         else:
             operator = '\\nabla'
-            if self.peek('LETTER') and self.scanner.lexeme == 'D':
+            if self.peek('CHARACTER') and self.scanner.lexeme == 'D':
                 self.scanner.lex()
             else: self.expect('COV_SYM')
         metric = self._property['metric'][diacritic] + diacritic
@@ -860,7 +793,7 @@ class Parser:
         elif self.accept('UNDERSCORE'):
             index = (self._indexing_2(), 'D')
         else:
-            sentence, position = self.scanner.sentence, self.scanner.mark()
+            sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
             raise ParserError('unexpected \'%s\' at position %d' %
                 (sentence[position], position), sentence, position)
         func_list, expression = self._expand_product(location, 'cd' + diacritic, index[1], index[0])
@@ -891,12 +824,18 @@ class Parser:
                     equation[3] += '_{' + covdrv_index + '} '
                 equation[0], equation[3] = equation[0] + latex, equation[3] + latex
             if location == 'RHS' and (self._property['suffix'] or symbol not in self._namespace):
-                with self.scanner.new_context():
+                with self.scanner.context():
+                    metric = self._property['metric'][diacritic] + diacritic
+                    dimension = self._namespace[metric + 'DD'].dimension # TODO
                     if index[1] == 'U':
-                        config = ' % assign ' + symbol + ' --suffix dD\n'
-                        self.parse_latex(''.join(equation) + config)
+                        # dimension = self._namespace[metric + 'UU'].dimension
+                        config = '% declare ' + symbol + '--dim %d  --suffix dD\n' % dimension
+                        self.parse_latex(config + ''.join(equation))
+                        # config = ' % assign ' + symbol + ' --suffix dD\n'
+                        # self.parse_latex(''.join(equation)) + config)
                     else:
-                        self.parse_latex(Generator.generate_covdrv(function, index[0], symbol, diacritic))
+                        # dimension = self._namespace[metric + 'DD'].dimension
+                        self.parse_latex(Generator.generate_covdrv(function, index[0], symbol, diacritic, dimension))
         return expression
 
     # <LIEDRV> -> <LIE_SYM> '_' <SYMBOL> ( <OPERATOR> | <SUBEXPR> )
@@ -907,7 +846,7 @@ class Parser:
         func_list, expression = self._expand_product(location, 'ld', vector)
         for symbol, function in func_list:
             if location == 'RHS' and (self._property['suffix'] or symbol not in self._namespace):
-                sentence, position = self.scanner.sentence, self.scanner.mark()
+                sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
                 symbol = str(function.args[0])
                 tensor = IndexedSymbol(function, self._namespace[symbol].dimension)
                 tensor.weight = self._namespace[symbol].weight
@@ -918,7 +857,8 @@ class Parser:
 
     # <TENSOR> -> <SYMBOL> [ ( '_' <INDEXING_4> ) | ( '^' <INDEXING_3> [ '_' <INDEXING_4> ] ) ]
     def _tensor(self, location='RHS'):
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        prev_state = self.scanner.prev_state
+        sentence, (position, _) = self.scanner.sentence, prev_state
         indexing = []
         symbol = list(self._strip(self._symbol()))
         if self.accept('UNDERSCORE'):
@@ -933,17 +873,17 @@ class Parser:
                 suffix = '_cd' if covariant else '_d'
                 symbol.append(suffix + order * 'D')
                 function = Function('Tensor')(Symbol(''.join(symbol)), *indexing)
-                old_latex = sentence[position:self.scanner.mark()]
+                old_latex = sentence[position:self.scanner.prev_state[0]]
                 new_latex = IndexedSymbol(function).latex_format(function)
                 self.scanner.sentence = sentence.replace(old_latex, new_latex)
                 self.scanner.marker = position
-                self.scanner.reset()
+                self.scanner.reset(prev_state)
                 return self._operator()
-        self.scanner.mark()
+        sym_state, prev_state = prev_state, self.scanner.prev_state
         if self.accept('CARET'):
             if self.accept('LBRACE'):
                 if self.accept('LBRACE'):
-                    self.scanner.reset()
+                    self.scanner.reset(prev_state)
                     symbol = ''.join(symbol)
                     function = Function('Tensor')(Symbol(symbol, real=True))
                     if symbol in self._namespace:
@@ -951,7 +891,7 @@ class Parser:
                             return self._namespace[symbol]
                     else: self._define_tensor(IndexedSymbol(function))
                     return function
-                self.scanner.reset(); self.scanner.lex()
+                self.scanner.reset(prev_state); self.scanner.lex()
             index = self._indexing_3()
             indexing.extend(index)
             symbol.extend(len(index) * ['U'])
@@ -967,11 +907,11 @@ class Parser:
                     suffix = '_cd' if covariant else '_d'
                     symbol.append(suffix + order * 'D')
                     function = Function('Tensor')(Symbol(''.join(symbol)), *indexing)
-                    old_latex = sentence[position:self.scanner.mark()]
+                    old_latex = sentence[position:self.scanner.prev_state[0]]
                     new_latex = IndexedSymbol(function).latex_format(function)
                     self.scanner.sentence = sentence.replace(old_latex, new_latex)
                     self.scanner.marker = position
-                    self.scanner.reset()
+                    self.scanner.reset(sym_state)
                     return self._operator()
         symbol = ''.join(symbol)
         if symbol in self._namespace:
@@ -980,7 +920,20 @@ class Parser:
         function = Function('Tensor')(Symbol(symbol, real=True), *indexing)
         tensor = IndexedSymbol(function)
         if symbol not in self._namespace and location == 'RHS':
-            if symbol[:7] == 'epsilon':
+            diacritic = next(diacritic for diacritic in ('bar', 'hat', 'tilde', '') if diacritic in symbol)
+            base_symbol = re.split(diacritic if diacritic else r'[UD]', symbol)[0]
+            if base_symbol in self._property['metric'][diacritic]:
+                metric = self._namespace[next(symbol for symbol in self._namespace \
+                    if base_symbol == re.split(diacritic if diacritic else r'[UD]', symbol)[0])]
+                with self.scanner.context():
+                    self.parse_latex(Generator.generate_metric(metric.symbol, metric.dimension, metric.suffix))
+            elif base_symbol == 'Gamma':
+                base_symbol = self._property['metric'][diacritic]
+                metric = self._namespace[next(symbol for symbol in self._namespace \
+                    if base_symbol == re.split(diacritic if diacritic else r'[UD]', symbol)[0])]
+                with self.scanner.context():
+                    self.parse_latex(Generator.generate_connection(metric.symbol, diacritic))
+            elif base_symbol == 'epsilon':
                 # instantiate permutation (Levi-Civita) symbol using parity
                 def sgn(sequence):
                     """ Permutation Signature (Parity)"""
@@ -1011,7 +964,7 @@ class Parser:
                     for suffix in product(*('UD' if i == 'U' else 'DU' for _, i in IndexedSymbol.indexing(function))):
                         symbol_RHS = base_symbol + ''.join(suffix)
                         if symbol_RHS in self._namespace:
-                            with self.scanner.new_context():
+                            with self.scanner.context():
                                 diacritic = 'bar'   if 'bar'   in symbol \
                                        else 'hat'   if 'hat'   in symbol \
                                        else 'tilde' if 'tilde' in symbol \
@@ -1043,13 +996,13 @@ class Parser:
                                         else:
                                             latex += '\\mathrm{%s}_{%s %s} ' % (metric, idx, indexing_RHS[i])
                                 latex += IndexedSymbol.latex_format(Function('Tensor')(Symbol(symbol_RHS, real=True), *indexing_RHS))
-                                suffix = self._namespace[symbol_RHS].suffix
-                                if suffix or self._namespace[symbol_RHS].metric:
-                                    latex += ' % assign ' + symbol
-                                    if suffix:
-                                        latex += ' --suffix ' + suffix + ' '
-                                    if self._namespace[symbol_RHS].metric:
-                                        latex += ' --metric ' + metric + ' '
+                                # suffix = self._namespace[symbol_RHS].suffix
+                                # if suffix or self._namespace[symbol_RHS].metric:
+                                #     latex += ' % assign ' + symbol
+                                #     if suffix:
+                                #         latex += ' --suffix ' + suffix + ' '
+                                #     if self._namespace[symbol_RHS].metric:
+                                #         latex += ' --metric ' + metric + ' '
                                 self.parse_latex(latex)
                             return function
                     raise ParserError('cannot index undefined variable \'%s\' at position %d' %
@@ -1057,43 +1010,40 @@ class Parser:
                 else: self._define_tensor(tensor)
         return function
 
-    # <SYMBOL> -> <LETTER> | <SYMB_CMD> '{' <VARIABLE> '}' | <DIACRITIC> '{' <SYMBOL> '}'
+    # <SYMBOL> -> <CHARACTER> | <MULTISYMB> | <DIACRITIC> '{' <SYMBOL> '}'
     def _symbol(self):
         lexeme = self.scanner.lexeme
-        if self.accept('LETTER'):
+        if self.accept('CHARACTER'):
             return lexeme
-        if self.accept('SYMB_CMD'):
-            self.expect('LBRACE')
-            symbol = self._variable()
-            self.expect('RBRACE')
-            return symbol
+        if self.accept('MULTISYMB'):
+            return lexeme[8:-1]
         if self.accept('DIACRITIC'):
             self.expect('LBRACE')
             symbol = self._symbol() + lexeme[1:]
             self.expect('RBRACE')
             return symbol
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         raise ParserError('unexpected \'%s\' at position %d' %
             (sentence[position], position), sentence, position)
 
-    # <INDEXING_1> -> <LETTER> [ '_' <INDEXING_2> ] | <INTEGER>
+    # <INDEXING_1> -> <CHARACTER> [ '_' <INDEXING_2> ] | <INTEGER>
     def _indexing_1(self):
         lexeme = self._strip(self.scanner.lexeme)
-        if self.accept('LETTER'):
+        if self.accept('CHARACTER'):
             index = Symbol(lexeme, real=True) if not self.accept('UNDERSCORE') \
                 else Symbol('%s_%s' % (lexeme, self._indexing_2()), real=True)
             return index if index not in self._property['coord'] \
                 else Integer(self._property['coord'].index(index))
         elif self.accept('INTEGER'):
             return Integer(lexeme)
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         raise ParserError('unexpected \'%s\' at position %d' %
             (sentence[position], position), sentence, position)
 
-    # <INDEXING_2> -> <LETTER> | <INTEGER> | '{' <INDEXING_1> '}'
+    # <INDEXING_2> -> <CHARACTER> | <INTEGER> | '{' <INDEXING_1> '}'
     def _indexing_2(self):
         lexeme = self._strip(self.scanner.lexeme)
-        if self.accept('LETTER'):
+        if self.accept('CHARACTER'):
             index = Symbol(lexeme, real=True)
             return index if index not in self._property['coord'] \
                 else Integer(self._property['coord'].index(index))
@@ -1103,7 +1053,7 @@ class Parser:
             indexing = self._indexing_1()
             self.expect('RBRACE')
             return indexing
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         raise ParserError('unexpected \'%s\' at position %d' %
             (sentence[position], position), sentence, position)
 
@@ -1139,16 +1089,7 @@ class Parser:
             return indexing, order
         return [self._indexing_2()], order
 
-    # <VARIABLE> -> <LETTER> { [ '_' ] ( <LETTER> | <INTEGER> ) }*
-    def _variable(self):
-        variable = self.scanner.lexeme
-        self.expect('LETTER')
-        while any(self.peek(token) for token in ('UNDERSCORE', 'LETTER', 'INTEGER')):
-            variable += self.scanner.lexeme
-            self.scanner.lex()
-        return variable
-
-    # <NUMBER> -> [ '-' ] ( <RATIONAL> | <DECIMAL> | <INTEGER> | <PI> )
+    # <NUMBER> -> [ '-' ] ( <RATIONAL> | <DECIMAL> | <INTEGER> | <CONSTANT> )
     def _number(self):
         sign = -1 if self.accept('MINUS') else 1
         number = self.scanner.lexeme
@@ -1159,9 +1100,9 @@ class Parser:
             return sign * Float(number)
         if self.accept('INTEGER'):
             return sign * Integer(number)
-        if self.accept('PI'):
+        if self.accept('CONSTANT'):
             return sign * pi
-        sentence, position = self.scanner.sentence, self.scanner.mark()
+        sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
         raise ParserError('unexpected \'%s\' at position %d' %
             (sentence[position], position), sentence, position)
 
@@ -1181,28 +1122,31 @@ class Parser:
         suffix = '_' + suffix[:-1]
         tensor, index = self._namespace[symbol], str(index)
         symbol = symbol + ('' if suffix in symbol else suffix) + 'D'
-        with self.scanner.new_context():
-            if symbol not in self._namespace:
-                if location == 'RHS' and tensor.equation:
-                    LHS, RHS = tensor.equation[0]
-                    tree, idx_set = ExprTree(tensor.equation[1]), set()
-                    for subtree in tree.preorder():
-                        subexpr = subtree.expr
-                        if subexpr.func == Function('Tensor'):
-                            idx_set.update(subexpr.args[1:])
-                    idx_set = {str(i) for i in idx_set}
-                    if index in idx_set:
-                        idx_gen = IndexedSymbol.index_count()
-                        index = next(x for x in idx_gen if x not in idx_set)
-                    if '_' in str(index):
-                        base, subscript = str(index).split('_')
-                        if len(base) > 1:
-                            index = '\\%s_%s' % (base, subscript)
-                    elif len(str(index)) > 1:
-                        index = '\\' + str(index)
-                    impsum = '' if tensor.impsum else ' % noimpsum'
-                    self.parse_latex('\\partial_{%s} %s = \\partial_{%s} (%s)%s'
-                        % (index, LHS.strip(), index, RHS.rstrip(' \n\\'), impsum))
+        if symbol not in self._namespace and location == 'RHS' and tensor.equation:
+            # print('>', self.scanner.lexeme, self.scanner.token)
+            with self.scanner.context():
+                LHS, RHS = tensor.equation[0]
+                tree, idx_set = ExprTree(tensor.equation[1]), set()
+                for subtree in tree.preorder():
+                    subexpr = subtree.expr
+                    if subexpr.func == Function('Tensor'):
+                        idx_set.update(subexpr.args[1:])
+                idx_set = {str(i) for i in idx_set}
+                if index in idx_set:
+                    idx_gen = IndexedSymbol.index_count()
+                    index = next(x for x in idx_gen if x not in idx_set)
+                if '_' in str(index):
+                    base, subscript = str(index).split('_')
+                    if len(base) > 1:
+                        index = '\\%s_%s' % (base, subscript)
+                elif len(str(index)) > 1:
+                    index = '\\' + str(index)
+                impsum = '' if tensor.impsum else ' % noimpsum'
+                # print('\\partial_{%s} %s = \\partial_{%s} (%s)%s'
+                #     % (index, LHS.strip(), index, RHS.rstrip(' \n\\'), impsum))
+                self.parse_latex('\\partial_{%s} %s = \\partial_{%s} (%s)%s'
+                    % (index, LHS.strip(), index, RHS.rstrip(' \n\\'), impsum))
+            # print('<', self.scanner.lexeme, self.scanner.token)
         function = Function('Tensor')(Symbol(symbol, real=True), *indices)
         if symbol not in self._namespace:
             symmetry = 'nosym'
@@ -1298,7 +1242,7 @@ class Parser:
 
     def expect(self, token):
         if not self.accept(token):
-            sentence, position = self.scanner.sentence, self.scanner.mark()
+            sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
             raise ParserError('expected token %s at position %d' %
                 (token, position), sentence, position)
 

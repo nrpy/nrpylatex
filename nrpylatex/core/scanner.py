@@ -18,24 +18,47 @@ class Scanner:
             r'\\[uU]psilon', r'\\[pP]hi', r'\\[cC]hi', r'\\[pP]si', r'\\[oO]mega', r'\\varepsilon', r'\\varkappa',
             r'\\varphi', r'\\varpi', r'\\varrho', r'\\varsigma', r'\\vartheta', r'[a-zA-Z]'))
         self.deprecated = [('\\text', '\\mathrm')]
-        self.token_dict = [
+
+        token_dict_cfg = [
             ('LINEBREAK',       r'\r?\n'),
             ('WHITESPACE',      r'\s+'),
-            ('SYMMETRY',        symmetry),
+            ('COMMENT',         r'\%\%([^\n]*|.*$)'),
+            ('PERCENT',         r'\%'),
             ('STRING',          r'\"[^\"]*\"'),
-            ('GROUP',           r'\<[0-9]+(\.{2})?\>'),
+            ('ARROW',           r'\-\>'),
+            ('LDASH',           r'\-\-'),
+            ('LDOTS',           r'\.\.'),
+            ('SYMMETRY',        symmetry),
+            ('ZEROS_OPT',       r'zeros'),
+            ('CONST_OPT',       r'const'),
+            ('DIM_OPT',         r'dim'),
+            ('SYM_OPT',         r'sym'),
+            ('WEIGHT_OPT',      r'weight'),
+            ('SUFFIX_OPT',      r'suffix'),
+            ('METRIC_OPT',      r'metric'),
+            ('COORD_KWD',       r'coord'),
+            ('INDEX_KWD',       r'index'),
+            ('IDENTIFIER',      alphabet + r'((%s)|[_0-9])*' % alphabet),
+            ('INTEGER',         r'[0-9]+'),
+            ('NEWLINE',         r'\\{2}')]
+        self.pattern_cfg = re.compile('|'.join(['(?P<%s>%s)' % pattern for pattern in token_dict_cfg]))
+        self.token_dict_cfg = dict(token_dict_cfg)
+
+        token_dict_eqn = [
+            ('LINEBREAK',       r'\r?\n'),
+            ('WHITESPACE',      r'\s+'),
+            ('COMMENT',         r'\%\%([^\n]*|.*$)'),
+            ('PERCENT',         r'\%'),
             ('RATIONAL',        r'[0-9]+\/\-?[1-9][0-9]*'),
             ('DECIMAL',         r'[0-9]+\.[0-9]+'),
             ('INTEGER',         r'[0-9]+'),
-            ('ARROW',           r'\-\>'),
             ('PLUS',            r'\+'),
             ('MINUS',           r'\-'),
             ('DIVIDE',          r'\/'),
             ('EQUAL',           r'\='),
             ('CARET',           r'\^'),
             ('UNDERSCORE',      r'\_'),
-            ('COMMENT',         r'\%'),
-            ('PRIME',           r'\''),
+            ('APOSTROPHE',      r'\''),
             ('COMMA',           r'\,'),
             ('COLON',           r'\:'),
             ('SEMICOLON',       r'\;'),
@@ -43,127 +66,101 @@ class Scanner:
             ('RPAREN',          r'\)'),
             ('LBRACK',          r'\['),
             ('RBRACK',          r'\]'),
+            ('LBRACE_ESC',      r'\\{'),
+            ('RBRACE_ESC',      r'\\}'),
             ('LBRACE',          r'\{'),
             ('RBRACE',          r'\}'),
+            ('DECLARE_CFG',     r'declare'),
+            ('REPLACE_CFG',     r'replace'),
+            ('IGNORE_CFG',      r'ignore'),
             ('PAR_SYM',         r'\\partial'),
             ('COV_SYM',         r'\\nabla'),
             ('LIE_SYM',         r'\\mathcal\{L\}'),
-            ('SYMB_CMD',        r'\\mathrm'),
-            ('FUNC_CMD',        r'\\exp'),
+            ('EXP_CMD',         r'\\exp'),
+            ('LOG_CMD',         r'\\ln|\\log'),
             ('FRAC_CMD',        r'\\frac'),
             ('SQRT_CMD',        r'\\sqrt'),
-            ('NLOG_CMD',        r'\\ln|\\log'),
             ('TRIG_CMD',        r'\\sinh|\\cosh|\\tanh|\\sin|\\cos|\\tan'),
-            ('DEFINE_MACRO',    r'define'),
-            ('ASSIGN_MACRO',    r'assign'),
-            ('IGNORE_MACRO',    r'ignore'),
-            ('SREPL_MACRO',     r'srepl'),
-            ('INDEX_MACRO',     r'index'),
-            ('COORD_MACRO',     r'coord'),
-            ('ZEROS',           r'zeros'),
-            ('CONST',           r'const'),
-            ('DIM',             r'dim'),
-            ('SYM',             r'sym'),
-            ('WEIGHT',          r'weight'),
-            ('SUFFIX',          r'suffix'),
-            ('METRIC',          r'metric'),
-            ('DEFAULT',         r'default'),
-            ('PERSIST',         r'persist'),
-            ('NOIMPSUM',        r'noimpsum'),
-            ('DIACRITIC',       r'\\hat|\\tilde|\\bar'),
-            ('PI',              r'\\pi'),
-            ('LETTER',          alphabet),
-            ('COMMAND',         r'\\[a-zA-Z]+'),
-            ('NEWLINE',         r'\\{2}'),
-            ('BACKSLASH',       r'\\')]
-        self.regex = re.compile('|'.join(['(?P<%s>%s)' % pattern for pattern in self.token_dict]))
-        self.token_dict = dict(self.token_dict)
+            ('SUFFIX_KWD',      r'suffix'),
+            ('METRIC_KWD',      r'metric'),
+            ('NOIMPSUM_KWD',    r'noimpsum'),
+            ('CONSTANT',        r'\\pi'),
+            ('DIACRITIC',       r'\\hat|\\bar|\\tilde'),
+            ('MULTISYMB',       r'\\mathrm{(%s)((%s)|[_0-9])*}' % (alphabet, alphabet)),
+            ('GROUP',           r'\\[1-9][0-9]*\*?'),
+            ('CHARACTER',       alphabet),
+            ('NEWLINE',         r'\\{2}')]
+        self.pattern_eqn = re.compile('|'.join(['(?P<%s>%s)' % pattern for pattern in token_dict_eqn]))
+        self.token_dict_eqn = dict(token_dict_eqn)
 
-    def initialize(self, sentence, position=0, whitespace=False):
-        """ Initialize Scanner
+    def initialize(self, sentence, state=None):
+        while True:
+            sentence_ = re.sub(r'\\mathrm{([^{}]*)\\mathrm{([^{}]+)}([^{}]*)}', r'\\mathrm{\1\2\3}', sentence)
+            if sentence_ == sentence: break
+            sentence = sentence_
 
-            :arg: sentence (raw string)
-            :arg: position
-        """
         for feature, replacement in self.deprecated:
             if feature in sentence:
                 warnings.warn(feature + ' is deprecated.', DeprecatedWarning)
             sentence = sentence.replace(feature, replacement)
 
         self.sentence = sentence
-        self.token    = None
-        self.lexeme   = None
-        self.marker   = None
-        self.index    = position
-        self._whitespace = whitespace
+        if state is None:
+            self.position   = 0
+            self.eqn_mode   = True
+            self.token      = None
+            self.lexeme     = None
+            self.prev_state = (0, True)
+        else:
+            self.position, self.eqn_mode = state
+            self.lex()
 
     def tokenize(self):
-        """ Tokenize Sentence
-
-            :return: token iterator
-        """
-        while self.index < len(self.sentence):
-            token = self.regex.match(self.sentence, self.index)
+        while self.position < len(self.sentence):
+            pattern = self.pattern_eqn if self.eqn_mode else self.pattern_cfg
+            token = pattern.match(self.sentence, self.position)
             if token is None:
                 raise ScannerError('unexpected \'%s\' at position %d' %
-                    (self.sentence[self.index], self.index), self.sentence, self.index)
-            self.index = token.end()
-            if self.whitespace or token.lastgroup not in ('WHITESPACE', 'LINEBREAK'):
-                self.lexeme = token.group()
-                yield token.lastgroup
+                    (self.sentence[self.position], self.position), self.sentence, self.position)
+            self.prev_state = (self.position, self.eqn_mode)
+            if token.lastgroup.endswith('CFG'):
+                self.eqn_mode = False
+            self.position = token.end()
+            if token.lastgroup in ('COMMENT', 'WHITESPACE') or \
+                    self.eqn_mode and token.lastgroup == 'LINEBREAK':
+                continue
+            self.lexeme = token.group()
+            if token.lastgroup == 'LINEBREAK':
+                self.eqn_mode = True
+            yield token.lastgroup
 
     def lex(self):
-        """ Retrieve Next Token
-
-            :return: next token
-        """
         try:
             self.token = next(self.tokenize())
         except StopIteration:
             self.token  = None
             self.lexeme = ''
+            self.prev_state = (self.position, self.eqn_mode)
         return self.token
 
-    def mark(self):
-        """ Mark Iterator Position
-
-            :return: previous position
-        """
-        self.marker = self.index - len(self.lexeme)
-        return self.marker
-
-    def reset(self, index=None):
-        """ Reset Token Iterator """
+    def reset(self, state):
         if not self.sentence:
             raise RuntimeError('cannot reset uninitialized scanner')
-        self.initialize(self.sentence, self.marker if index is None else index, self.whitespace)
-        self.lex()
+        self.initialize(self.sentence, state)
 
-    @property
-    def whitespace(self):
-        return self._whitespace
-
-    @whitespace.setter
-    def whitespace(self, flag):
-        if not flag:
-            while self.token in ('WHITESPACE', 'LINEBREAK'):
-                self.lex()
-        self._whitespace = flag
-
-    def new_context(self):
+    def context(self):
         return self.ScannerContext(self)
 
     class ScannerContext():
 
         def __init__(self, scanner):
             self.scanner = scanner
-            self.state = (scanner.sentence, scanner.mark(), scanner.whitespace)
+            self.init_args = (scanner.sentence, scanner.prev_state)
 
         def __enter__(self): return
 
         def __exit__(self, exc_type, exc_value, exc_tb):
-            self.scanner.initialize(*self.state)
-            self.scanner.lex()
+            self.scanner.initialize(*self.init_args)
 
 class ScannerError(NRPyLaTeXError):
 

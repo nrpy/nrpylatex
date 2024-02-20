@@ -2,4 +2,8 @@ dist/
 build/
 *.egg-info/
 __pycache__/
+.mypy_cache/
+.vscode/
+.venv/
+*.ipynb
 *.pyc

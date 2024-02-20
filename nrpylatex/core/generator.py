@@ -20,7 +20,7 @@ class Generator:
         if self._property['debug']:
             lineno = '[%d]' % self._property['debug']
             print('%s Python' % (len(lineno) * ' '))
-            print('%s   %s\n' % (len(lineno) * ' ', LHS_RHS))
+            print('%s   %s\n' % (len(lineno) * ' ', LHS_RHS.replace('\n', '\n      ')))
             self._property['debug'] += 1
 
         global_env = dict(self._namespace)
@@ -80,8 +80,7 @@ class Generator:
                         if str(index) in self._property['index']:
                             dimension = self._property['index'][str(index)]
                         if str(index) in index_range and dimension != index_range[str(index)]:
-                            raise GeneratorError('inconsistent loop/summation range for index \'%s\'' %
-                                index, self.scanner.sentence)
+                            raise GeneratorError('inconsistent loop/summation range for index \'%s\'' % index)
                         index_range[str(index)] = dimension
                     function = IndexedSymbol(subexpr).array_format(subexpr)
                     modified = modified.replace(srepr(subexpr), function)
@@ -100,8 +99,7 @@ class Generator:
                         if str(index) in self._property['index']:
                             dimension = self._property['index'][str(index)]
                         if str(index) in index_range and dimension != index_range[str(index)]:
-                            raise GeneratorError('inconsistent loop/summation range for index \'%s\'' %
-                                index, self.scanner.sentence)
+                            raise GeneratorError('inconsistent loop/summation range for index \'%s\'' % index)
                         index_range[str(index)] = dimension
                         if index not in self._property['coord']:
                             derivative += ', (coord[%s], %s)' % (index, order)
@@ -157,7 +155,7 @@ class Generator:
         dimension_LHS = None
         if free_index_LHS:
             if len(uniquify(index_range[index] for index, _ in free_index_LHS)) > 1:
-                raise GeneratorError('cannot infer dimension of \'%s\'' % symbol_LHS, self.scanner.sentence)
+                raise GeneratorError('cannot infer dimension of \'%s\'' % symbol_LHS)
             index, _ = free_index_LHS[0]
             dimension_LHS = index_range[index]
 
@@ -208,42 +206,55 @@ class Generator:
         return uniquify(free_index), bound_index
 
     @staticmethod
-    def generate_metric(symbol, dimension, diacritic, suffix):
+    def generate_metric(symbol, dimension, suffix):
         latex_config = ''
         if 'U' in symbol:
             prefix = r'\epsilon_{' + ' '.join('i_' + str(i) for i in range(1, 1 + dimension)) + '} ' + \
-                    r'\epsilon_{' + ' '.join('j_' + str(i) for i in range(1, 1 + dimension)) + '} '
+                     r'\epsilon_{' + ' '.join('j_' + str(i) for i in range(1, 1 + dimension)) + '} '
             det_latex = prefix + ' '.join(r'\mathrm{{{symbol}}}^{{i_{n} j_{n}}}'.format(symbol=symbol[:-2], n=i) for i in range(1, 1 + dimension))
             inv_latex = prefix + ' '.join(r'\mathrm{{{symbol}}}^{{i_{n} j_{n}}}'.format(symbol=symbol[:-2], n=i) for i in range(2, 1 + dimension))
+            if suffix:
+                latex_config += r"% declare {symbol}det {inv_symbol} --dim {dimension} --suffix {suffix}" \
+                    .format(suffix=suffix, symbol=symbol[:-2], inv_symbol=symbol.replace('U', 'D'), dimension=dimension)
+            else:
+                latex_config += r"% declare {symbol}det --dim {dimension}".format(symbol=symbol[:-2], dimension=dimension)
             latex_config += r"""
-    \mathrm{{{symbol}det}} = \frac{{1}}{{({dimension})({factorial})}} {det_latex} \\
-    \mathrm{{{symbol}}}_{{i_1 j_1}} = \frac{{1}}{{{factorial}}} \mathrm{{{symbol}det}}^{{{{-1}}}} ({inv_latex})""" \
+\mathrm{{{symbol}det}} = \frac{{1}}{{({dimension})({factorial})}} {det_latex} \\
+\mathrm{{{symbol}}}_{{i_1 j_1}} = \frac{{1}}{{{factorial}}} \mathrm{{{symbol}det}}^{{{{-1}}}} ({inv_latex}) \\""" \
                 .format(symbol=symbol[:-2], inv_symbol=symbol.replace('U', 'D'), dimension=dimension,
                     factorial=math.factorial(dimension - 1), det_latex=det_latex, inv_latex=inv_latex)
-            latex_config += '\n' + r"% assign {symbol}det --dim {dimension}".format(symbol=symbol[:-2], dimension=dimension)
-            if suffix:
-                latex_config += '\n' + r"% assign {symbol}det {inv_symbol} --suffix {suffix}" \
-                    .format(suffix=suffix, symbol=symbol[:-2], inv_symbol=symbol.replace('U', 'D'))
+            # latex_config += '\n' + r"% assign {symbol}det --dim {dimension}".format(symbol=symbol[:-2], dimension=dimension)
+            # if suffix:
+            #     latex_config += '\n' + r"% assign {symbol}det {inv_symbol} --suffix {suffix}" \
+            #         .format(suffix=suffix, symbol=symbol[:-2], inv_symbol=symbol.replace('U', 'D'))
         else:
             prefix = r'\epsilon^{' + ' '.join('i_' + str(i) for i in range(1, 1 + dimension)) + '} ' + \
-                    r'\epsilon^{' + ' '.join('j_' + str(i) for i in range(1, 1 + dimension)) + '} '
+                     r'\epsilon^{' + ' '.join('j_' + str(i) for i in range(1, 1 + dimension)) + '} '
             det_latex = prefix + ' '.join(r'\mathrm{{{symbol}}}_{{i_{n} j_{n}}}'.format(symbol=symbol[:-2], n=i) for i in range(1, 1 + dimension))
             inv_latex = prefix + ' '.join(r'\mathrm{{{symbol}}}_{{i_{n} j_{n}}}'.format(symbol=symbol[:-2], n=i) for i in range(2, 1 + dimension))
+            if suffix:
+                latex_config += r"% declare {symbol}det {inv_symbol} --dim {dimension} --suffix {suffix}" \
+                    .format(suffix=suffix, symbol=symbol[:-2], inv_symbol=symbol.replace('D', 'U'), dimension=dimension)
+            else:
+                latex_config += r"% declare {symbol}det --dim {dimension}".format(symbol=symbol[:-2], dimension=dimension)
             latex_config += r"""
-    \mathrm{{{symbol}det}} = \frac{{1}}{{({dimension})({factorial})}} {det_latex} \\
-    \mathrm{{{symbol}}}^{{i_1 j_1}} = \frac{{1}}{{{factorial}}} \mathrm{{{symbol}det}}^{{{{-1}}}} ({inv_latex})""" \
+\mathrm{{{symbol}det}} = \frac{{1}}{{({dimension})({factorial})}} {det_latex} \\
+\mathrm{{{symbol}}}^{{i_1 j_1}} = \frac{{1}}{{{factorial}}} \mathrm{{{symbol}det}}^{{{{-1}}}} ({inv_latex}) \\""" \
                 .format(symbol=symbol[:-2], inv_symbol=symbol.replace('D', 'U'), dimension=dimension,
                     factorial=math.factorial(dimension - 1), det_latex=det_latex, inv_latex=inv_latex)
-            latex_config += '\n' + r"% assign {symbol}det --dim {dimension}".format(symbol=symbol[:-2], dimension=dimension)
-            if suffix:
-                latex_config += '\n' + r"% assign {symbol}det {inv_symbol} --suffix {suffix}" \
-                    .format(suffix=suffix, symbol=symbol[:-2], inv_symbol=symbol.replace('D', 'U'))
-        metric = '\\mathrm{' + re.split(r'[UD]', symbol)[0] + '}'
-        latex_config += '\n' + r'\mathrm{{Gamma{diacritic}}}^{{i_1}}_{{i_2 i_3}} = \frac{{1}}{{2}} {metric}^{{i_1 i_4}} (\partial_{{i_2}} {metric}_{{i_3 i_4}} + \partial_{{i_3}} {metric}_{{i_4 i_2}} - \partial_{{i_4}} {metric}_{{i_2 i_3}})'.format(metric=metric, diacritic=diacritic)
+            # latex_config += '\n' + r"% assign {symbol}det --dim {dimension}".format(symbol=symbol[:-2], dimension=dimension)
+            # if suffix:
+            #     latex_config += '\n' + r"% assign {symbol}det {inv_symbol} --suffix {suffix}" \
+            #         .format(suffix=suffix, symbol=symbol[:-2], inv_symbol=symbol.replace('D', 'U'))
         return latex_config
 
     @staticmethod
-    def generate_covdrv(function, covdrv_index, symbol=None, diacritic=None):
+    def generate_connection(symbol, diacritic):
+        return r'\mathrm{{Gamma{diacritic}}}^{{i_1}}_{{i_2 i_3}} = \frac{{1}}{{2}} {metric}^{{i_1 i_4}} (\partial_{{i_2}} {metric}_{{i_3 i_4}} + \partial_{{i_3}} {metric}_{{i_4 i_2}} - \partial_{{i_4}} {metric}_{{i_2 i_3}})' \
+            .format(metric='\\mathrm{' + re.split(r'[UD]', symbol)[0] + '}', diacritic=diacritic)
+
+    @staticmethod
+    def generate_covdrv(function, covdrv_index, symbol=None, diacritic=None, dimension=None):
         indexing = [str(index) for index in function.args[1:]] + [str(covdrv_index)]
         idx_gen = IndexedSymbol.index_count()
         for i, index in enumerate(indexing):
@@ -277,8 +288,10 @@ class Generator:
                 RHS += '^{%s}_{%s %s} (%s)' % (index, bound_index, covdrv_index, latex)
             else:
                 RHS += '^{%s}_{%s %s} (%s)' % (bound_index, index, covdrv_index, latex)
-        config = (' % assign ' + symbol + ' --suffix dD\n') if symbol else ''
-        return LHS + ' = ' + RHS + config
+        config = ('% declare ' + symbol + ' --dim %d --suffix dD\n' % dimension) if symbol else ''
+        return config + LHS + ' = ' + RHS
+        # config = (' % assign ' + symbol + ' --suffix dD\n') if symbol else ''
+        # return LHS + ' = ' + RHS + config
 
     @staticmethod
     def generate_liedrv(function, vector, weight=None):
