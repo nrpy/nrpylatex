@@ -90,7 +90,8 @@ class Scanner:
             ('MULTISYMB',       r'\\mathrm{(%s)((%s)|[_0-9])*}' % (alphabet, alphabet)),
             ('GROUP',           r'\\[1-9][0-9]*\*?'),
             ('CHARACTER',       alphabet),
-            ('NEWLINE',         r'\\{2}')]
+            ('NEWLINE',         r'\\{2}'),
+            ('BACKSLASH',       r'\\')]
         self.pattern_eqn = re.compile('|'.join(['(?P<%s>%s)' % pattern for pattern in token_dict_eqn]))
         self.token_dict_eqn = dict(token_dict_eqn)
 

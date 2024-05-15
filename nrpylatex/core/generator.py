@@ -240,7 +240,7 @@ class Generator:
     @staticmethod
     def generate_connection(symbol, diacritic):
         return r'\mathrm{{Gamma{diacritic}}}^{{i_1}}_{{i_2 i_3}} = \frac{{1}}{{2}} {metric}^{{i_1 i_4}} (\partial_{{i_2}} {metric}_{{i_3 i_4}} + \partial_{{i_3}} {metric}_{{i_4 i_2}} - \partial_{{i_4}} {metric}_{{i_2 i_3}})' \
-            .format(metric='\\mathrm{' + re.split(r'[UD]', symbol)[0] + '}', diacritic=diacritic)
+            .format(metric='\\mathrm{' + symbol.rstrip('UD') + '}', diacritic=diacritic)
 
     @staticmethod
     def generate_covdrv(function, covdrv_index, symbol=None, diacritic=None, dimension=None):

@@ -345,7 +345,7 @@ class Parser:
             tensor.symmetry = 'sym01'
             self._define_tensor(tensor, zeros=zeros)
             diacritic = next(diacritic for diacritic in ('bar', 'hat', 'tilde', '') if diacritic in symbol)
-            metric_symbol = re.split(diacritic if diacritic else r'[UD]', symbol)[0]
+            metric_symbol = re.split(diacritic, symbol)[0] if diacritic else symbol.rstrip('UD')
             if self._property['metric'][diacritic] != metric_symbol:
                 if 'GammaUDD' + diacritic in self._namespace:
                     del self._namespace['GammaUDD' + diacritic]
@@ -409,6 +409,8 @@ class Parser:
         LHS, RHS = function, expand(tree.root.expr) if indexed else tree.root.expr
         symbol, indices = str(function.args[0]), function.args[1:]
         global_env, dimension, suffix = self.generator.generate(LHS, RHS, impsum)
+        if dimension is None and symbol in self._namespace:
+            dimension = self._namespace[symbol].dimension
         if any(isinstance(index, Integer) for index in indices):
             tensor = self._namespace[symbol]
             if tensor.suffix is not None and tensor.equation is None:
@@ -761,8 +763,6 @@ class Parser:
         if metric + 'DD' not in self._namespace:
             raise ParserError('cannot generate covariant derivative without defined metric \'%s\'' %
                 metric, self.scanner.sentence, position)
-        if len(metric) > 1:
-            metric = '\\mathrm{' + metric + '}'
         if self.accept('CARET'):
             index = (self._indexing_2(), 'U')
         elif self.accept('UNDERSCORE'):
@@ -792,7 +792,10 @@ class Parser:
                 if index[1] == 'U':
                     equation[0] += '^{' + covdrv_index + '} '
                     bound_index = next(x for x in idx_gen if x not in indexing)
-                    equation[2] += '%s^{%s %s} ' % (metric, covdrv_index, bound_index)
+                    if len(metric) > 1:
+                        equation[2] += '\mathrm{%s}^{%s %s} ' % (metric, covdrv_index, bound_index)
+                    else:
+                        equation[2] += '%s^{%s %s} ' % (metric, covdrv_index, bound_index)
                     equation[3] += '_{' + bound_index + '} '
                 else:
                     equation[0] += '_{' + covdrv_index + '} '
@@ -800,7 +803,6 @@ class Parser:
                 equation[0], equation[3] = equation[0] + latex, equation[3] + latex
             if location == 'RHS' and (self._property['suffix'] or symbol not in self._namespace):
                 with self.scanner.context():
-                    metric = self._property['metric'][diacritic] + diacritic
                     suffix = 'DD' if metric + 'DD' in self._namespace else 'UU'
                     dimension = self._namespace[metric + suffix].dimension
                     if index[1] == 'U':
@@ -821,9 +823,8 @@ class Parser:
                 symbol = str(function.args[0])
                 tensor = IndexedSymbol(function, self._namespace[symbol].dimension)
                 tensor.weight = self._namespace[symbol].weight
-                self.parse_latex(Generator.generate_liedrv(function, vector, tensor.weight))
-                self.scanner.initialize(sentence, position)
-                self.scanner.lex()
+                with self.scanner.context():
+                    self.parse_latex(Generator.generate_liedrv(function, vector, tensor.weight))
         return expression
 
     # <TENSOR> -> <SYMBOL> [ ( '_' <INDEXING_4> ) | ( '^' <INDEXING_3> [ '_' <INDEXING_4> ] ) ]
@@ -892,16 +893,16 @@ class Parser:
         tensor = IndexedSymbol(function)
         if symbol not in self._namespace and location == 'RHS':
             diacritic = next(diacritic for diacritic in ('bar', 'hat', 'tilde', '') if diacritic in symbol)
-            base_symbol = re.split(diacritic if diacritic else r'[UD]', symbol)[0]
+            base_symbol = re.split(diacritic, symbol)[0] if diacritic else symbol.rstrip('UD')
             if base_symbol in self._property['metric'][diacritic]:
                 metric = self._namespace[next(symbol for symbol in self._namespace \
-                    if base_symbol == re.split(diacritic if diacritic else r'[UD]', symbol)[0])]
+                    if base_symbol == (re.split(diacritic, symbol)[0] if diacritic else symbol.rstrip('UD')))]
                 with self.scanner.context():
                     self.parse_latex(Generator.generate_metric(metric.symbol, metric.dimension, metric.suffix))
             elif base_symbol == 'Gamma':
                 base_symbol = self._property['metric'][diacritic]
                 metric = self._namespace[next(symbol for symbol in self._namespace \
-                    if base_symbol == re.split(diacritic if diacritic else r'[UD]', symbol)[0])]
+                    if base_symbol == (re.split(diacritic, symbol)[0] if diacritic else symbol.rstrip('UD')))]
                 with self.scanner.context():
                     self.parse_latex(Generator.generate_connection(metric.symbol, diacritic))
             elif base_symbol == 'epsilon':
