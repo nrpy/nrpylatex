@@ -2,6 +2,7 @@
 # Author: Ken Sible
 # Email:  ksible *at* outlook *dot* com
 
+from nrpylatex.core.parser import Parser
 import nrpylatex as nl, sympy as sp, unittest
 parse_latex = lambda sentence: nl.parse_latex(sentence, reset=True)
 
@@ -110,6 +111,7 @@ class TestParser(unittest.TestCase):
             str(nl.parse_latex(expr)),
             "x_n**4 + xprime_n*exp(x_n*y_n**2)"
         )
+        Parser.initialize(reset=True)
 
     def test_recursive_replacement(self):
         nl.parse_latex(r"""
@@ -122,6 +124,7 @@ class TestParser(unittest.TestCase):
             str(nl.parse_latex(expr)),
             "trK**2 + trK"
         )
+        Parser.initialize(reset=True)
 
     def test_product_rule(self):
         self.assertEqual(
@@ -183,7 +186,7 @@ class TestParser(unittest.TestCase):
     def test_notation_pardrv(self):
         self.assertEqual(
             set(parse_latex(r"""
-                % declare index a..z --dim 2
+                % declare index --dim 2
                 % declare vD uD wD --dim 2 --suffix dD
                 T_{abc} = ((v_a + u_a)_{,b} - w_{a,b})_{,c}
             """)),
@@ -197,7 +200,7 @@ class TestParser(unittest.TestCase):
         parse_latex(r"""
             % declare coord theta phi
             % declare index --dim 2
-            % declare gDD --zeros --dim 2
+            % declare metric gDD --zeros --dim 2
             % declare r --const
             % g_{0 0} = r^2 \\
             % g_{1 1} = r^2 \sin^2{\theta} \\
@@ -297,16 +300,18 @@ class TestParser(unittest.TestCase):
             set(parse_latex(r"""
                 % declare deltaDD --zeros --dim 3
                 \delta_{ii} = 1 % noimpsum
-                % \hat{\gamma}_{ij} = \delta_{ij} % metric
+                % declare metric gammahatDD --dim 3
+                % \hat{\gamma}_{ij} = \delta_{ij}
                 % declare hDD --dim 3 --sym sym01
-                % \bar{\gamma}_{ij} = h_{ij} + \hat{\gamma}_{ij} % metric
+                % declare metric gammabarDD --dim 3
+                % \bar{\gamma}_{ij} = h_{ij} + \hat{\gamma}_{ij}
                 % T^i_{jk} = \hat{\Gamma}^i_{jk} + \bar{\Gamma}^i_{jk}
             """)),
-            {'deltaDD', 'gammahatDD', 'hDD', 'gammabarDD', 'gammahatdet', 'epsilonUUU', 'gammahatUU', 'GammahatUDD', 'gammabardet', 'gammabarUU', 'GammabarUDD', 'TUDD'}
+            {'deltaDD', 'gammahatDD', 'gammahatDD_dD', 'hDD', 'gammabarDD', 'gammabarDD_dD', 'gammahatdet', 'epsilonUUU', 'gammahatUU', 'GammahatUDD', 'hDD_dD', 'gammabardet', 'gammabarUU', 'GammabarUDD', 'TUDD'}
         )
 
     def test_annotation_noimpsum(self):
-        self.assertEqual( # TODO inferred suffix when replacing tensor components
+        self.assertEqual(
             set(parse_latex(r"""
                 % declare coord r theta phi
                 % declare vD --zeros --dim 3
@@ -397,7 +402,7 @@ class TestParser(unittest.TestCase):
         )
 
     def test_schwarzschild_metric(self):
-        nl.parse_latex(r"""
+        parse_latex(r"""
             % declare coord t r theta phi
             % declare metric gDD --zeros --dim 4
             % declare G M --const
@@ -406,7 +411,7 @@ class TestParser(unittest.TestCase):
                 g_{t t} &= -\left(1 - \frac{2GM}{r}\right) \\
                 g_{r r} &=  \left(1 - \frac{2GM}{r}\right)^{-1} \\
                 g_{\theta \theta} &= r^2 \\
-                g_{\phi \phi} &= r^2 \sin^2{\theta} \\
+                g_{\phi \phi} &= r^2 \sin^2{\theta}
             \end{align}
         """)
         self.assertEqual(str(gDD[0][0]),
@@ -439,7 +444,7 @@ class TestParser(unittest.TestCase):
                 K &= R^{\alpha\beta\mu\nu} R_{\alpha\beta\mu\nu} \\
                 R_{\beta\nu} &= R^\alpha_{\beta\alpha\nu} \\
                 R &= g^{\beta\nu} R_{\beta\nu} \\
-                G_{\beta\nu} &= R_{\beta\nu} - \frac{1}{2}g_{\beta\nu}R \\
+                G_{\beta\nu} &= R_{\beta\nu} - \frac{1}{2}g_{\beta\nu}R
             \end{align}
         """)
         self.assertEqual(str(gdet),
@@ -498,16 +503,16 @@ class TestParser(unittest.TestCase):
                 K &= R^{\alpha\beta\mu\nu} R_{\alpha\beta\mu\nu} \\
                 R_{\beta\nu} &= R^\alpha_{\beta\alpha\nu} \\
                 R &= g^{\beta\nu} R_{\beta\nu} \\
-                G_{\beta\nu} &= R_{\beta\nu} - \frac{1}{2}g_{\beta\nu}R \\
+                G_{\beta\nu} &= R_{\beta\nu} - \frac{1}{2}g_{\beta\nu}R
             \end{align}
             \begin{align}
                 % declare coord r theta phi
-                % declare metric gbarDD --dim 3
-                \bar{g}_{ij} &= g_{ij} \\
+                % declare metric gammaDD --zeros --dim 3
+                \gamma_{ij} &= g_{ij} \\
                 \beta_i &= g_{0 i} \\
-                \alpha &= \sqrt{\bar{g}^{ij}\beta_i\beta_j - g_{0 0}} \\
-                K_{ij} &= \frac{1}{2\alpha}\left(\bar{\nabla}_i \beta_j + \bar{\nabla}_j \beta_i\right) \\
-                K &= \bar{g}^{ij} K_{ij} \\
+                \alpha &= \sqrt{\gamma^{ij}\beta_i\beta_j - g_{0 0}} \\
+                K_{ij} &= \frac{1}{2\alpha}\left(\nabla_i \beta_j + \nabla_j \beta_i\right) \\
+                K &= \gamma^{ij} K_{ij}
             \end{align}
         """)
         for i in range(3):
@@ -515,7 +520,7 @@ class TestParser(unittest.TestCase):
                 self.assertEqual(KDD[i][j], 0)
 
     def test_hamiltonian_momentum_contraint(self):
-        nl.parse_latex(r"""
+        parse_latex(r"""
             % declare coord t r theta phi
             % declare metric gDD --zeros --dim 4
             % declare G M --const
@@ -531,23 +536,23 @@ class TestParser(unittest.TestCase):
                 K &= R^{\alpha\beta\mu\nu} R_{\alpha\beta\mu\nu} \\
                 R_{\beta\nu} &= R^\alpha_{\beta\alpha\nu} \\
                 R &= g^{\beta\nu} R_{\beta\nu} \\
-                G_{\beta\nu} &= R_{\beta\nu} - \frac{1}{2}g_{\beta\nu}R \\
+                G_{\beta\nu} &= R_{\beta\nu} - \frac{1}{2}g_{\beta\nu}R
             \end{align}
             \begin{align}
                 % declare coord r theta phi
-                % declare metric gbarDD --dim 3
-                \bar{g}_{ij} &= g_{ij} \\
+                % declare metric gammaDD --zeros --dim 3
+                \gamma_{ij} &= g_{ij} \\
                 \beta_i &= g_{0 i} \\
-                \alpha &= \sqrt{\bar{g}^{ij}\beta_i\beta_j - g_{0 0}} \\
-                K_{ij} &= \frac{1}{2\alpha}\left(\bar{\nabla}_i \beta_j + \bar{\nabla}_j \beta_i\right) \\
-                K &= \bar{g}^{ij} K_{ij} \\
+                \alpha &= \sqrt{\gamma^{ij}\beta_i\beta_j - g_{0 0}} \\
+                K_{ij} &= \frac{1}{2\alpha}\left(\nabla_i \beta_j + \nabla_j \beta_i\right) \\
+                K &= \gamma^{ij} K_{ij} \\
             \end{align}
             \begin{align}
-                R_{ij} &= \partial_k \bar{\Gamma}^k_{ij} - \partial_j \bar{\Gamma}^k_{ik}
-                    + \bar{\Gamma}^k_{ij}\bar{\Gamma}^l_{kl} - \bar{\Gamma}^l_{ik}\bar{\Gamma}^k_{lj} \\
-                R &= \bar{g}^{ij} R_{ij} \\
+                R_{ij} &= \partial_k \Gamma^k_{ij} - \partial_j \Gamma^k_{ik}
+                    + \Gamma^k_{ij}\Gamma^l_{kl} - \Gamma^l_{ik}\Gamma^k_{lj} \\
+                R &= \gamma^{ij} R_{ij} \\
                 E &= \frac{1}{16\pi}\left(R + K^{{2}} - K_{ij}K^{ij}\right) \\
-                p_i &= \frac{1}{8\pi}\left(D_j \bar{g}^{jk} K_{ki} - D_i K\right) \\
+                p_i &= \frac{1}{8\pi}\left(D_j \gamma^{jk} K_{ki} - D_i K\right)
             \end{align}
         """)
         self.assertEqual(sp.simplify(E), 0)
@@ -558,7 +563,7 @@ class TestParser(unittest.TestCase):
         for DIM in range(2, 5):
             parse_latex(r"""
                 % declare metric gDD --dim {DIM}
-                % declare index a..c --dim {DIM}
+                % declare index --dim {DIM}
                 T^a_c = g^{{ab}} g_{{bc}}
             """.format(DIM=DIM))
             for i in range(DIM):
@@ -569,7 +574,7 @@ class TestParser(unittest.TestCase):
         for DIM in range(2, 5):
             parse_latex(r"""
                 % declare metric gUU --dim {DIM}
-                % declare index a..c --dim {DIM}
+                % declare index --dim {DIM}
                 T^a_c = g^{{ab}} g_{{bc}}
             """.format(DIM=DIM))
             for i in range(DIM):

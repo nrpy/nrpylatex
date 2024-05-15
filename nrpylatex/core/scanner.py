@@ -82,7 +82,6 @@ class Scanner:
             ('SQRT_CMD',        r'\\sqrt'),
             ('TRIG_CMD',        r'\\sinh|\\cosh|\\tanh|\\sin|\\cos|\\tan'),
             ('SUFFIX_KWD',      r'suffix'),
-            ('METRIC_KWD',      r'metric'),
             ('NOIMPSUM_KWD',    r'noimpsum'),
             ('CONSTANT',        r'\\pi'),
             ('DIACRITIC',       r'\\hat|\\bar|\\tilde'),

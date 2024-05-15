@@ -157,7 +157,7 @@ class CoordinateSystem(list):
 class IndexedSymbol:
 
     def __init__(self, function, dimension=None, structure=None, equation=None,
-            symmetry=None, suffix=None, metric=None, weight=None, impsum=True):
+            symmetry=None, suffix=None, weight=None, impsum=True):
         self.overridden  = False
         self.symbol      = str(function.args[0])
         self.rank        = 0
@@ -171,7 +171,6 @@ class IndexedSymbol:
         self.equation    = equation
         self.symmetry    = symmetry
         self.suffix      = suffix
-        self.metric      = metric
         self.weight      = weight
         self.impsum      = impsum
 
