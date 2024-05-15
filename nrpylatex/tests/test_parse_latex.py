@@ -129,7 +129,7 @@ class TestParser(unittest.TestCase):
     def test_product_rule(self):
         self.assertEqual(
             set(parse_latex(r"""
-                % declare index --dim 2
+                % declare index latin --dim 2
                 % declare vU wU --dim 2 --suffix dD
                 T^{ab}_c = \partial_c (v^a w^b)
             """)),
@@ -142,7 +142,7 @@ class TestParser(unittest.TestCase):
     def test_upwind_suffix(self):
         self.assertEqual(
             set(parse_latex(r"""
-                % declare index --dim 2
+                % declare index latin --dim 2
                 % declare vU --dim 2 --suffix dD
                 % declare w --const
                 T^a_c = % suffix dupD
@@ -157,7 +157,7 @@ class TestParser(unittest.TestCase):
     def test_inference_covdrv(self):
         self.assertEqual(
             set(parse_latex(r"""
-                % declare index --dim 4
+                % declare index latin --dim 4
                 % declare metric gDD --dim 4 --suffix dD
                 % declare vU --dim 4 --suffix dD
                 T^{ab} = \nabla^b v^a
@@ -169,7 +169,7 @@ class TestParser(unittest.TestCase):
         self.assertEqual(
             set(parse_latex(r"""
                 % declare coord x y
-                % declare index --dim 2
+                % declare index latin --dim 2
                 % declare uD --zeros --dim 2
                 u_x = x^2 + 2x \\
                 u_y = y\sqrt{x}
@@ -186,7 +186,7 @@ class TestParser(unittest.TestCase):
     def test_notation_pardrv(self):
         self.assertEqual(
             set(parse_latex(r"""
-                % declare index --dim 2
+                % declare index latin --dim 2
                 % declare vD uD wD --dim 2 --suffix dD
                 T_{abc} = ((v_a + u_a)_{,b} - w_{a,b})_{,c}
             """)),
@@ -199,7 +199,8 @@ class TestParser(unittest.TestCase):
     def test_spherical_riemann(self):
         parse_latex(r"""
             % declare coord theta phi
-            % declare index --dim 2
+            % declare index latin --dim 2
+            % declare index greek --dim 2
             % declare metric gDD --zeros --dim 2
             % declare r --const
             % g_{0 0} = r^2 \\
@@ -563,7 +564,7 @@ class TestParser(unittest.TestCase):
         for DIM in range(2, 5):
             parse_latex(r"""
                 % declare metric gDD --dim {DIM}
-                % declare index --dim {DIM}
+                % declare index latin --dim {DIM}
                 T^a_c = g^{{ab}} g_{{bc}}
             """.format(DIM=DIM))
             for i in range(DIM):
@@ -574,7 +575,7 @@ class TestParser(unittest.TestCase):
         for DIM in range(2, 5):
             parse_latex(r"""
                 % declare metric gUU --dim {DIM}
-                % declare index --dim {DIM}
+                % declare index latin --dim {DIM}
                 T^a_c = g^{{ab}} g_{{bc}}
             """.format(DIM=DIM))
             for i in range(DIM):

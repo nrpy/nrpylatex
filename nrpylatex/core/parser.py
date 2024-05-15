@@ -14,6 +14,13 @@ from sympy import pi, exp, log, sqrt, expand, diff
 from collections import OrderedDict
 import re
 
+LATIN_ALPHABET = [chr(i) for i in range(97, 123)]
+GREEK_ALPHABET = [
+    'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
+    'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'omikron', 'pi', 'rho',
+    'sigma', 'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega'
+]
+
 class Parser:
 
     _namespace, _property = OrderedDict(), {}
@@ -33,12 +40,8 @@ class Parser:
         if reset: Parser._namespace.clear()
         Parser._property['replace'] = []
         Parser._property['coord'] = CoordinateSystem('x')
-        Parser._property['index'] = {chr(i): 3 for i in range(97, 123)}
-        Parser._property['index'].update({i: 4 for i in [
-            'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
-            'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'omikron', 'pi', 'rho',
-            'sigma', 'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega'
-        ]})
+        Parser._property['index'] = {index: 3 for index in LATIN_ALPHABET}
+        Parser._property['index'].update({index: 4 for index in GREEK_ALPHABET})
         Parser._property['ignore'] = ['\\left', '\\right', '{}', '&']
         Parser._property['metric'] = {'': '', 'bar': '', 'hat': '', 'tilde': ''}
         Parser._property['suffix'] = 'dD'
@@ -149,10 +152,10 @@ class Parser:
         while True:
             symbols.append(self.scanner.lexeme)
             self.expect('IDENTIFIER')
-            if self.peek('LDASH') or self.peek('LINEBREAK'): break
+            if self.peek('DBL_DASH') or self.peek('LINEBREAK'): break
         dimension = symmetry = weight = suffix = metric = None
         const = zeros = False
-        while self.accept('LDASH'):
+        while self.accept('DBL_DASH'):
             if self.accept('CONST_OPT'):
                 const = True
             elif self.accept('ZEROS_OPT'):
@@ -257,7 +260,7 @@ class Parser:
         self.scanner.lex()
         self.accept('LINEBREAK')
 
-    # <COORD> -> <COORD_KWD> { <IDENTIFIER> }*
+    # <COORD> -> <COORD_KWD> ( { <IDENTIFIER> }+ | <DEFAULT_KWD> )
     def _coord(self):
         self.expect('COORD_KWD')
         del self._property['coord'][:]
@@ -272,33 +275,33 @@ class Parser:
                         (sentence[position], position), sentence, position)
                 self._property['coord'].append(symbol)
                 if self.peek('LINEBREAK'): break
-        else:
+        elif self.accept('DEFAULT_KWD'):
             self._property['coord'] = CoordinateSystem('x')
+        else:
+            sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
+            raise ParserError('unexpected \'%s\' at position %d' %
+                (sentence[position], position), sentence, position)
         self.accept('LINEBREAK')
 
-    # <INDEX> -> <INDEX_KWD> { <IDENTIFIER> [ '..' <IDENTIFIER> ] }* '--' <DIM_OPT> <INTEGER>
+    # <INDEX> -> <INDEX_KWD> ( { <IDENTIFIER> }+ | <LATIN_KWD> | <GREEK_KWD> ) '--' <DIM_OPT> <INTEGER>
     def _index(self):
         self.expect('INDEX_KWD')
         indices = []
         if self.peek('IDENTIFIER'):
             while True:
                 sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-                index_1 = self.scanner.lexeme
+                indices.append(self.scanner.lexeme)
                 self.expect('IDENTIFIER')
-                if self.accept('LDOTS'):
-                    index_2 = self.scanner.lexeme
-                    self.expect('IDENTIFIER')
-                    try:
-                        indices.extend([chr(i) for i in range(ord(index_1), ord(index_2) + 1)])
-                    except TypeError:
-                        raise ParserError('unsupported index range \'%s\' at position %d' %
-                            (sentence[position:self.scanner.position], position), sentence, position)
-                else:
-                    indices.append(index_1)
-                if self.peek('LDASH'): break
+                if self.peek('DBL_DASH'): break
+        elif self.accept('LATIN_KWD'):
+            indices.extend([index for index in LATIN_ALPHABET])
+        elif self.accept('GREEK_KWD'):
+            indices.extend([index for index in GREEK_ALPHABET])
         else:
-            indices.extend([index for index in self._property['index']])
-        self.expect('LDASH')
+            sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
+            raise ParserError('unexpected \'%s\' at position %d' %
+                (sentence[position], position), sentence, position)
+        self.expect('DBL_DASH')
         self.expect('DIM_OPT')
         dimension = self.scanner.lexeme
         self.expect('INTEGER')
@@ -313,10 +316,10 @@ class Parser:
         while True:
             symbols.append(self.scanner.lexeme)
             self.expect('IDENTIFIER')
-            if self.peek('LDASH') or self.peek('LINEBREAK'): break
+            if self.peek('DBL_DASH') or self.peek('LINEBREAK'): break
         dimension = suffix = None
         zeros = False
-        while self.accept('LDASH'):
+        while self.accept('DBL_DASH'):
             if self.accept('ZEROS_OPT'):
                 zeros = True
             else:
