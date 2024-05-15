@@ -73,7 +73,7 @@ jobs:
         run: python -m pip install -U git+https://github.com/sympy/sympy/
       - name: perform unit testing
         run: python -m unittest
-  test_nrpytutorial-ubuntu:
+  test_nrpy_bssn-ubuntu:
     runs-on: ubuntu-latest
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
@@ -83,11 +83,11 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.8.x
-      - name: install sympy (latest stable version)
-        run: python -m pip install ipython sympy
-      - name: clone nrpytutorial repository
+      - name: clone NRPy repository
         run: git clone https://github.com/nrpy/nrpy.git
+      - name: install dependencies
+        run: cd nrpy && pip install -r requirements-dev.txt
       - name: install nrpylatex from GitHub
         run: python -m pip install git+https://github.com/nrpy/nrpylatex.git
-      - name: change directory and perform unit testing
-        run: cd nrpy && python -m nrpy.equations.general_relativity.nrpylatex.test_parse_BSSN
+      - name: perform unit testing
+        run: python -m nrpy.equations.general_relativity.nrpylatex.test_parse_BSSN
