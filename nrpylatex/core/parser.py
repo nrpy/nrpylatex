@@ -219,45 +219,53 @@ class Parser:
             self._property['replace'].append([old, new])
         self.scanner.reset(prev_state)
         prev_state = self.scanner.prev_state
-        scanner = Scanner(); scanner.initialize(old)
-        substr_syntax = []
-        for token in scanner.tokenize():
-            substr_syntax.append((scanner.lexeme, token))
-        string_syntax = []
-        for token in self.scanner.tokenize():
-            string_syntax.append((self.scanner.position, self.scanner.lexeme, token))
-        sentence = self.scanner.sentence
-        i_1 = i_2 = offset = 0
-        for i, (index, lexeme, token) in enumerate(string_syntax):
-            if substr_syntax[0][0] == lexeme or substr_syntax[0][1] == 'GROUP':
-                k, index, varmap = i, index - len(lexeme), {}
-                for j, (_lexeme, _token) in enumerate(substr_syntax, start=i):
-                    if k >= len(string_syntax): break
-                    if _token == 'GROUP':
-                        varmap[_lexeme] = string_syntax[k][1]
-                        if _lexeme[-1] == '*':
-                            l, string = k + 1, varmap[_lexeme]
-                            if l < len(string_syntax) and j - i + 1 < len(substr_syntax):
-                                EOL = substr_syntax[j - i + 1]
-                                while string_syntax[l][1] != EOL[0]:
-                                    string += string_syntax[l][1]
-                                    if l + 1 >= len(string_syntax): break
-                                    l += 1
-                                else:
-                                    k, varmap[_lexeme] = l - 1, string
-                    elif _lexeme != string_syntax[k][1]: break
-                    if (j - i + 1) == len(substr_syntax):
-                        new_repl = new
-                        for var in varmap:
-                            new_repl = new_repl.replace(var, varmap[var])
-                        i_1, i_2 = index + offset, string_syntax[k][0] + offset
-                        old_repl = sentence[i_1:i_2]
-                        sentence = sentence[:i_1] + new_repl + sentence[i_2:]
-                        offset += len(new_repl) - len(old_repl)
-                    k += 1
-        self.scanner.sentence = sentence
-        self.scanner.reset(prev_state)
-        self.scanner.lex()
+        while True:
+            scanner = Scanner(); scanner.initialize(old)
+            substr_syntax = []
+            for token in scanner.tokenize():
+                substr_syntax.append((scanner.lexeme, token))
+            string_syntax = []
+            for token in self.scanner.tokenize():
+                string_syntax.append((self.scanner.position, self.scanner.lexeme, token))
+            sentence = self.scanner.sentence
+            characters = set()
+            i_1 = i_2 = offset = 0
+            for i, (index, lexeme, token) in enumerate(string_syntax):
+                if substr_syntax[0][0] == lexeme or substr_syntax[0][1] == 'GROUP':
+                    k, index, varmap = i, index - len(lexeme), {}
+                    for j, (_lexeme, _token) in enumerate(substr_syntax, start=i):
+                        if k >= len(string_syntax): break
+                        if _token == 'GROUP':
+                            varmap[_lexeme] = string_syntax[k][1]
+                            if _lexeme[-1] == '*':
+                                l, string = k + 1, varmap[_lexeme]
+                                if l < len(string_syntax) and j - i + 1 < len(substr_syntax):
+                                    EOL = substr_syntax[j - i + 1]
+                                    while string_syntax[l][1] != EOL[0]:
+                                        string += string_syntax[l][1]
+                                        if l + 1 >= len(string_syntax): break
+                                        l += 1
+                                    else:
+                                        k, varmap[_lexeme] = l - 1, string
+                        elif _lexeme != string_syntax[k][1]: break
+                        if (j - i + 1) == len(substr_syntax):
+                            new_repl = new
+                            for var in varmap:
+                                new_repl = new_repl.replace(var, varmap[var])
+                            i_1, i_2 = index + offset, string_syntax[k][0] + offset
+                            old_repl = sentence[i_1:i_2]
+                            sentence = sentence[:i_1] + new_repl + sentence[i_2:]
+                            offset += len(new_repl) - len(old_repl)
+                        k += 1
+                if substr_syntax[0][1] == 'CHARACTER' and len(substr_syntax[0][0]) > 1:
+                    characters.add(substr_syntax[0][0])
+            self.scanner.sentence = sentence
+            self.scanner.reset(prev_state)
+            self.scanner.lex()
+            if not characters: break
+            for character in characters:
+                old = old.replace(character, '\\mathrm{%s}' % character.lstrip('\\'))
+                new = new.replace(character, '\\mathrm{%s}' % character.lstrip('\\'))
         self.accept('LINEBREAK')
 
     # <COORD> -> <COORD_KWD> ( { <IDENTIFIER> }+ | <DEFAULT_KWD> )
@@ -397,9 +405,9 @@ class Parser:
         if self._property['debug']:
             (latex_LHS, latex_RHS), expr_RHS = equation
             lineno = '[%d]' % self._property['debug']
-            print('%s LaTeX' % lineno)
+            print('\033[96m{}\033[00m \033[92m{}\033[00m'.format(lineno, 'LaTeX'))
             print('%s   %s = %s' % (len(lineno) * ' ', latex_LHS, latex_RHS.rstrip()))
-            print('%s SymPy' % (len(lineno) * ' '))
+            print('{} \033[92m{}\033[00m'.format(len(lineno) * ' ', 'SymPy'))
             print('%s   %s = %s' % (len(lineno) * ' ', function, expr_RHS))
         if not indexed:
             for subtree in tree.preorder():

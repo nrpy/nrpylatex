@@ -19,7 +19,7 @@ class Generator:
         LHS_RHS, dimension, suffix = self.expand_summation(LHS, RHS, impsum)
         if self._property['debug']:
             lineno = '[%d]' % self._property['debug']
-            print('%s Python' % (len(lineno) * ' '))
+            print('{} \033[92m{}\033[00m'.format(len(lineno) * ' ', 'Python'))
             print('%s   %s\n' % (len(lineno) * ' ', LHS_RHS.replace('\n', '\n      ')))
             self._property['debug'] += 1
 
