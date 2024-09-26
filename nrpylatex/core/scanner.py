@@ -122,8 +122,8 @@ class Scanner:
             pattern = self.pattern_eqn if self.eqn_mode else self.pattern_cfg
             token = pattern.match(self.sentence, self.position)
             if token is None:
-                raise ScannerError('unexpected \'%s\' at position %d' %
-                    (self.sentence[self.position], self.position), self.sentence, self.position)
+                raise ScannerError('unexpected \'%s\'' % 
+                    self.sentence[self.position], self.sentence, self.position)
             self.prev_state = (self.position, self.eqn_mode)
             if token.lastgroup.endswith('CFG'):
                 self.eqn_mode = False
