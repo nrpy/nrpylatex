@@ -10,7 +10,7 @@ from nrpylatex.utils.exceptions import NRPyLaTeXError
 from nrpylatex.utils.functional import product
 from sympy import Function, Derivative, Symbol, Integer, Rational, Float, Pow
 from sympy import sin, cos, tan, sinh, cosh, tanh, asin, acos, atan, asinh, acosh, atanh
-from sympy import pi, exp, log, sqrt, expand, diff
+from sympy import pi, exp, log, sqrt, expand, sympify, diff
 from collections import OrderedDict
 import re
 
@@ -125,7 +125,7 @@ class Parser:
     # <CONFIG> -> <DECLARE> | <REPLACE> | <IGNORE> | <COORD> | <INDEX>
     def _config(self):
         prev_state = self.scanner.prev_state
-        config = self.scanner.lexeme
+        command = self.scanner.lexeme
         if self.accept('DECLARE_CFG'):
             if self.peek('COORD_KWD'):
                 self._coord()
@@ -142,8 +142,7 @@ class Parser:
             self._ignore()
         else:
             sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-            raise ParserError('unsupported command \'%s\' at position %d' %
-                (config, position), sentence, position)
+            raise ParserError('unsupported command \'%s\'' % command, sentence, position)
 
     # <DECLARE> -> <DECLARE_CFG> { <IDENTIFIER> }+ { '--' ( <CONST_OPT> | <ZEROS_OPT> | <OPTION> ) }*
     def _declare(self):
@@ -228,7 +227,6 @@ class Parser:
             for token in self.scanner.tokenize():
                 string_syntax.append((self.scanner.position, self.scanner.lexeme, token))
             sentence = self.scanner.sentence
-            characters = set()
             i_1 = i_2 = offset = 0
             for i, (index, lexeme, token) in enumerate(string_syntax):
                 if substr_syntax[0][0] == lexeme or substr_syntax[0][1] == 'GROUP':
@@ -257,11 +255,13 @@ class Parser:
                             sentence = sentence[:i_1] + new_repl + sentence[i_2:]
                             offset += len(new_repl) - len(old_repl)
                         k += 1
-                if substr_syntax[0][1] == 'CHARACTER' and len(substr_syntax[0][0]) > 1:
-                    characters.add(substr_syntax[0][0])
             self.scanner.sentence = sentence
             self.scanner.reset(prev_state)
             self.scanner.lex()
+            characters = set()
+            for _lexeme, _token in substr_syntax:
+                if _token == 'CHARACTER' and len(_lexeme) > 1:
+                    characters.add(_lexeme)
             if not characters: break
             for character in characters:
                 old = old.replace(character, '\\mathrm{%s}' % character.lstrip('\\'))
@@ -279,16 +279,14 @@ class Parser:
                 self.expect('IDENTIFIER')
                 symbol = Symbol(variable, real=True)
                 if symbol in self._property['coord']:
-                    raise ParserError('duplicate coordinate symbol \'%s\' at position %d' %
-                        (sentence[position], position), sentence, position)
+                    raise ParserError('duplicate coordinate symbol \'%s\'' % sentence[position], sentence, position)
                 self._property['coord'].append(symbol)
                 if self.peek('LINEBREAK'): break
         elif self.accept('DEFAULT_KWD'):
             self._property['coord'] = CoordinateSystem('x')
         else:
             sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-            raise ParserError('unexpected \'%s\' at position %d' %
-                (sentence[position], position), sentence, position)
+            raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
         self.accept('LINEBREAK')
 
     # <INDEX> -> <INDEX_KWD> ( { <IDENTIFIER> }+ | <LATIN_KWD> | <GREEK_KWD> ) '--' <DIM_OPT> <INTEGER>
@@ -307,8 +305,7 @@ class Parser:
             indices.extend([index for index in GREEK_ALPHABET])
         else:
             sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-            raise ParserError('unexpected \'%s\' at position %d' %
-                (sentence[position], position), sentence, position)
+            raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
         self.expect('DBL_DASH')
         self.expect('DIM_OPT')
         dimension = self.scanner.lexeme
@@ -379,12 +376,10 @@ class Parser:
             suffix = self.scanner.lexeme
             self.expect('IDENTIFIER')
             if suffix[0] != 'd' or suffix[-1] != 'D':
-                raise ParserError('unsupported suffix \'%s\' at position %d' %
-                    (suffix, position), sentence, position)
+                raise ParserError('unsupported suffix \'%s\'' % suffix, sentence, position)
             return 'suffix<>' + suffix
         sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-        raise ParserError('unexpected \'%s\' at position %d' %
-            (sentence[position], position), sentence, position)
+        raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
 
     # <ASSIGNMENT> -> <OPERATOR> = <EXPRESSION> [ '\\' ] [ '%' <NOIMPSUM_KWD> ]
     def _assignment(self):
@@ -422,8 +417,7 @@ class Parser:
         if any(isinstance(index, Integer) for index in indices):
             tensor = self._namespace[symbol]
             if tensor.suffix is not None and tensor.equation is None:
-                raise ParserError('cannot modify symbolic variable \'%s\' (use --zeros) at position %d' %
-                    (symbol, position_1), sentence, position_1)
+                raise ParserError('cannot modify symbolic variable \'%s\' (use --zeros)' % symbol, sentence, position_1)
             tensor.structure = global_env[symbol]
         else:
             if symbol in self._namespace and self._namespace[symbol].rank > 0:
@@ -522,8 +516,7 @@ class Parser:
         if any(self.peek(i) for i in ('LPAREN', 'LBRACK', 'LBRACE_ESC')):
             return self._subexpr()
         sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-        raise ParserError('unexpected \'%s\' at position %d' %
-            (sentence[position], position), sentence, position)
+        raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
 
     # <EXPONENT> -> <BASE> | '{' <EXPRESSION> '}' | '{' '{' <EXPRESSION> '}' '}'
     def _exponent(self):
@@ -549,8 +542,7 @@ class Parser:
             self.expect('RBRACE_ESC')
         else:
             sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-            raise ParserError('unexpected \'%s\' at position %d' %
-                (sentence[position], position), sentence, position)
+            raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
         return expr
 
     # <COMMAND> -> <EXP> | <LOG> | <FRAC> | <SQRT> | <TRIG>
@@ -567,8 +559,7 @@ class Parser:
         if self.peek('TRIG_CMD'):
             return self._trig()
         sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-        raise ParserError('unsupported command \'%s\' at position %d' %
-            (command, position), sentence, position)
+        raise ParserError('unsupported function \'%s\'' % command, sentence, position)
 
     # <EXP> -> <EXP_CMD> '{' <EXPRESSION> '}'
     def _exp(self):
@@ -580,8 +571,7 @@ class Parser:
         if func == 'exp':
             return exp(expr)
         sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-        raise ParserError('unsupported function \'%s\' at position %d' %
-            (func, position), sentence, position)
+        raise ParserError('unsupported function \'%s\'' % func, sentence, position)
 
     # <LOG> -> <LOG_CMD> [ '_' ( <NUMBER> | '{' <NUMBER> '}' ) ] '{' <EXPRESSION> '}'
     def _log(self):
@@ -694,8 +684,7 @@ class Parser:
             self._property['suffix'] = global_suffix
             return tensor
         sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-        raise ParserError('unsupported operator \'%s\' at position %d' %
-            (operator, position), sentence, position)
+        raise ParserError('unsupported operator \'%s\'' % operator, sentence, position)
 
     # <PARDRV> -> <PAR_SYM> '_' <INDEXING_2> ( <OPERATOR> | <SUBEXPR> )
     def _pardrv(self, location='RHS'):
@@ -769,16 +758,14 @@ class Parser:
             else: self.expect('COV_SYM')
         metric = self._property['metric'][diacritic] + diacritic
         if metric + 'DD' not in self._namespace:
-            raise ParserError('cannot generate covariant derivative without defined metric \'%s\'' %
-                metric, self.scanner.sentence, position)
+            raise ParserError('cannot generate covariant derivative without a metric', self.scanner.sentence, position)
         if self.accept('CARET'):
             index = (self._indexing_2(), 'U')
         elif self.accept('UNDERSCORE'):
             index = (self._indexing_2(), 'D')
         else:
             sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-            raise ParserError('unexpected \'%s\' at position %d' %
-                (sentence[position], position), sentence, position)
+            raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
         func_list, expression = self._expand_product(location, 'cd' + diacritic, index[1], index[0])
         for symbol, function in func_list:
             if index[1] == 'U':
@@ -801,7 +788,7 @@ class Parser:
                     equation[0] += '^{' + covdrv_index + '} '
                     bound_index = next(x for x in idx_gen if x not in indexing)
                     if len(metric) > 1:
-                        equation[2] += '\mathrm{%s}^{%s %s} ' % (metric, covdrv_index, bound_index)
+                        equation[2] += '\\mathrm{%s}^{%s %s} ' % (metric, covdrv_index, bound_index)
                     else:
                         equation[2] += '%s^{%s %s} ' % (metric, covdrv_index, bound_index)
                     equation[3] += '_{' + bound_index + '} '
@@ -924,17 +911,16 @@ class Parser:
                             cycle_length += i > j
                     return (-1)**cycle_length
                 index = [chr(105 + n) for n in range(tensor.rank)]
-                prefix = '[' * tensor.rank + 'sgn([' + ', '.join(index) + '])'
+                prefix = '[' * tensor.rank + 'sympify(sgn([' + ', '.join(index) + ']))'
                 suffix = ''.join(' for %s in range(%d)]' % (index[tensor.rank - i], tensor.rank)
                     for i in range(1, tensor.rank + 1))
-                tensor.structure = eval(prefix + suffix, {'sgn': sgn})
+                tensor.structure = eval(prefix + suffix, {'sgn': sgn, 'sympify': sympify})
                 tensor.dimension = tensor.rank
                 self._define_tensor(tensor)
             else:
                 if tensor.rank > 0:
                     if any(suffix in symbol for suffix in ('_d', '_dup', '_cd', '_ld')):
-                        raise ParserError('cannot index undefined variable \'%s\' at position %d' %
-                            (symbol, position), sentence, position)
+                        raise ParserError('cannot index undefined variable \'%s\'' % symbol, sentence, position)
                     i, base_symbol = len(symbol) - 1, symbol
                     while i >= 0:
                         if base_symbol[i] not in ('U', 'D'):
@@ -951,8 +937,8 @@ class Parser:
                                        else ''
                                 metric = self._property['metric'][diacritic] + diacritic
                                 if metric + 'DD' not in self._namespace:
-                                    raise ParserError('cannot raise/lower index for \'%s\' without defined metric at position %d' %
-                                        (symbol, position), sentence, position)
+                                    raise ParserError('cannot raise/lower index for \'%s\' without a metric' %
+                                        symbol, sentence, position)
                                 indexing_LHS = indexing_RHS = [str(index) for index in indexing]
                                 idx_gen = IndexedSymbol.index_count()
                                 for i, index in enumerate(indexing_LHS):
@@ -977,8 +963,7 @@ class Parser:
                                 latex += IndexedSymbol.latex_format(Function('Tensor')(Symbol(symbol_RHS, real=True), *indexing_RHS))
                                 self.parse_latex(latex)
                             return function
-                    raise ParserError('cannot index undefined variable \'%s\' at position %d' %
-                        (symbol, position), sentence, position)
+                    raise ParserError('cannot index undefined variable \'%s\'' % symbol, sentence, position)
                 else: self._define_tensor(tensor)
         return function
 
@@ -995,8 +980,7 @@ class Parser:
             self.expect('RBRACE')
             return symbol
         sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-        raise ParserError('unexpected \'%s\' at position %d' %
-            (sentence[position], position), sentence, position)
+        raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
 
     # <INDEXING_1> -> <CHARACTER> [ '_' <INDEXING_2> ] | <INTEGER>
     def _indexing_1(self):
@@ -1009,8 +993,7 @@ class Parser:
         elif self.accept('INTEGER'):
             return Integer(lexeme)
         sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-        raise ParserError('unexpected \'%s\' at position %d' %
-            (sentence[position], position), sentence, position)
+        raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
 
     # <INDEXING_2> -> <CHARACTER> | <INTEGER> | '{' <INDEXING_1> '}'
     def _indexing_2(self):
@@ -1026,8 +1009,7 @@ class Parser:
             self.expect('RBRACE')
             return indexing
         sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-        raise ParserError('unexpected \'%s\' at position %d' %
-            (sentence[position], position), sentence, position)
+        raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
 
     # <INDEXING_3> -> <INDEXING_2> | '{' { <INDEXING_1> }+ '}'
     def _indexing_3(self):
@@ -1075,8 +1057,7 @@ class Parser:
         if self.accept('CONSTANT'):
             return sign * pi
         sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-        raise ParserError('unexpected \'%s\' at position %d' %
-            (sentence[position], position), sentence, position)
+        raise ParserError('unexpected \'%s\'' % sentence[position], sentence, position)
 
     def _define_tensor(self, tensor, zeros=False):
         symbol, dimension = tensor.symbol, tensor.dimension
@@ -1211,8 +1192,7 @@ class Parser:
     def expect(self, token):
         if not self.accept(token):
             sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state
-            raise ParserError('expected token %s at position %d' %
-                (token, position), sentence, position)
+            raise ParserError('expected token %s' % token, sentence, position)
 
 class ParserError(NRPyLaTeXError):
 

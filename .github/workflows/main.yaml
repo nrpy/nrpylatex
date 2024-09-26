@@ -83,11 +83,11 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.8.x
-      - name: clone NRPy repository
+      - name: clone nrpy repository
         run: git clone https://github.com/nrpy/nrpy.git
       - name: install dependencies
         run: cd nrpy && pip install -r requirements-dev.txt
-      - name: install nrpylatex from GitHub
-        run: python -m pip install git+https://github.com/nrpy/nrpylatex.git
+      - name: upgrade nrpylatex
+        run: python -m pip install git+https://github.com/nrpy/nrpylatex.git -U
       - name: perform unit testing
-        run: python -m nrpy.equations.general_relativity.nrpylatex.test_parse_BSSN
+        run: cd nrpy && python nrpy/equations/general_relativity/nrpylatex/test_parse_BSSN.py

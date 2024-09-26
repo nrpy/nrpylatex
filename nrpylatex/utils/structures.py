@@ -391,7 +391,7 @@ def _symmetrize_rank2(indexed_symbol, symmetry, dimension):
         for i, j in product(range(dimension), repeat=2):
             if sym[-2:] == '01':
                 if j < i: indexed_symbol[i][j] = sign*indexed_symbol[j][i]
-                elif i == j and sign < 0: indexed_symbol[i][j] = 0
+                elif i == j and sign < 0: indexed_symbol[i][j] = sympify(0)
             elif sym == 'nosym': pass
             else: raise IndexedSymbolError('unsupported symmetry option \'' + sym + '\'')
     return indexed_symbol
@@ -410,13 +410,13 @@ def _symmetrize_rank3(indexed_symbol, symmetry, dimension):
         for i, j, k in product(range(dimension), repeat=3):
             if sym[-2:] == '01':
                 if j < i: indexed_symbol[i][j][k] = sign*indexed_symbol[j][i][k]
-                elif i == j and sign < 0: indexed_symbol[i][j][k] = 0
+                elif i == j and sign < 0: indexed_symbol[i][j][k] = sympify(0)
             elif sym[-2:] == '02':
                 if k < i: indexed_symbol[i][j][k] = sign*indexed_symbol[k][j][i]
-                elif i == k and sign < 0: indexed_symbol[i][j][k] = 0
+                elif i == k and sign < 0: indexed_symbol[i][j][k] = sympify(0)
             elif sym[-2:] == '12':
                 if k < j: indexed_symbol[i][j][k] = sign*indexed_symbol[i][k][j]
-                elif j == k and sign < 0: indexed_symbol[i][j][k] = 0
+                elif j == k and sign < 0: indexed_symbol[i][j][k] = sympify(0)
             elif sym == 'nosym': pass
             else: raise IndexedSymbolError('unsupported symmetry option \'' + sym + '\'')
     return indexed_symbol
@@ -437,22 +437,22 @@ def _symmetrize_rank4(indexed_symbol, symmetry, dimension):
         for i, j, k, l in product(range(dimension), repeat=4):
             if sym[-2:] == '01':
                 if j < i: indexed_symbol[i][j][k][l] = sign*indexed_symbol[j][i][k][l]
-                elif i == j and sign < 0: indexed_symbol[i][j][k][l] = 0
+                elif i == j and sign < 0: indexed_symbol[i][j][k][l] = sympify(0)
             elif sym[-2:] == '02':
                 if k < i: indexed_symbol[i][j][k][l] = sign*indexed_symbol[k][j][i][l]
-                elif i == k and sign < 0: indexed_symbol[i][j][k][l] = 0
+                elif i == k and sign < 0: indexed_symbol[i][j][k][l] = sympify(0)
             elif sym[-2:] == '03':
                 if l < i: indexed_symbol[i][j][k][l] = sign*indexed_symbol[l][j][k][i]
-                elif i == l and sign < 0: indexed_symbol[i][j][k][l] = 0
+                elif i == l and sign < 0: indexed_symbol[i][j][k][l] = sympify(0)
             elif sym[-2:] == '12':
                 if k < j: indexed_symbol[i][j][k][l] = sign*indexed_symbol[i][k][j][l]
-                elif j == k and sign < 0: indexed_symbol[i][j][k][l] = 0
+                elif j == k and sign < 0: indexed_symbol[i][j][k][l] = sympify(0)
             elif sym[-2:] == '13':
                 if l < j: indexed_symbol[i][j][k][l] = sign*indexed_symbol[i][l][k][j]
-                elif j == l and sign < 0: indexed_symbol[i][j][k][l] = 0
+                elif j == l and sign < 0: indexed_symbol[i][j][k][l] = sympify(0)
             elif sym[-2:] == '23':
                 if l < k: indexed_symbol[i][j][k][l] = sign*indexed_symbol[i][j][l][k]
-                elif k == l and sign < 0: indexed_symbol[i][j][k][l] = 0
+                elif k == l and sign < 0: indexed_symbol[i][j][k][l] = sympify(0)
             elif sym == 'nosym': pass
             else: raise IndexedSymbolError('unsupported symmetry option \'' + sym + '\'')
     return indexed_symbol
