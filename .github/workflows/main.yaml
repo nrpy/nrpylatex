@@ -6,9 +6,9 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: 3.8.x
       - name: install sympy (latest stable version)
@@ -20,9 +20,9 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: 3.8.x
       - name: install sympy (latest stable version)
@@ -34,9 +34,9 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: 3.8.x
       - name: install sympy (latest stable version)
@@ -48,9 +48,9 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: 3.8.x
       - name: install sympy (earliest supported version)
@@ -62,9 +62,9 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: 3.8.x
       - name: install ipython
@@ -78,16 +78,16 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: 3.8.x
       - name: clone nrpy repository
         run: git clone https://github.com/nrpy/nrpy.git
       - name: install dependencies
         run: cd nrpy && pip install -r requirements-dev.txt
-      - name: upgrade nrpylatex
-        run: python -m pip install git+https://github.com/nrpy/nrpylatex.git -U
+      - name: install nrpylatex-dev
+        run: python -m pip install git+https://github.com/nrpy/nrpylatex.git@d8c3fc1d8df80364f9c80d07f333784f3f27c6cc
       - name: perform unit testing
         run: cd nrpy && python nrpy/equations/general_relativity/nrpylatex/test_parse_BSSN.py
