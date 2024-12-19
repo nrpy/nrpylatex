@@ -1,0 +1,52 @@
+[tool.poetry]
+name = "nrpylatex"
+version = "1.4.0"
+description = "LaTeX Interface to SymPy (CAS) for General Relativity"
+license = "BSD-2-Clause"
+authors = ["Ken Sible <ksible@outlook.com>"]
+readme = "README.md"
+homepage = "https://github.com/nrpy/nrpylatex"
+classifiers = [
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Text Processing :: Markup :: LaTeX",
+    "Topic :: Software Development :: Code Generators"
+]
+include = ["LICENSE"]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+sympy = "^1.9"
+ipython = { version = "^8.30.0", python = ">=3.10", optional = true }
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+mypy = { version = "^1.13.0", python = ">=3.10" }
+ruff = { version = "^0.8.3", python = ">=3.10" }
+black = { version = "^24.10.0", python = ">=3.10" }
+
+[tool.poetry.extras]
+jupyter = ["ipython"]
+
+[tool.black]
+skip-string-normalization = true
+line-length = 100
+
+[tool.ruff]
+extend-select = ["I"]
+line-length = 100
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
