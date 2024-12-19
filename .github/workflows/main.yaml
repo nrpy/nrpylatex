@@ -1,4 +1,4 @@
-name: CI
+name: Python CI
 on: [push]
 jobs:
   sympy_stable-ubuntu:
@@ -6,13 +6,13 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
-          python-version: 3.8.x
-      - name: install sympy (latest stable version)
-        run: python -m pip install ipython sympy
+          python-version: 3.x
+      - name: install sympy (latest stable)
+        run: python -m pip install sympy
       - name: perform unit testing
         run: python -m unittest
   sympy_stable-windows:
@@ -20,13 +20,13 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
-          python-version: 3.8.x
-      - name: install sympy (latest stable version)
-        run: python -m pip install ipython sympy
+          python-version: 3.x
+      - name: install sympy (latest stable)
+        run: python -m pip install sympy
       - name: perform unit testing
         run: python -m unittest
   sympy_stable-macos:
@@ -34,13 +34,13 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
-          python-version: 3.8.x
-      - name: install sympy (latest stable version)
-        run: python -m pip install ipython sympy
+          python-version: 3.x
+      - name: install sympy (latest stable)
+        run: python -m pip install sympy
       - name: perform unit testing
         run: python -m unittest
   sympy_earliest-ubuntu:
@@ -48,13 +48,13 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
-          python-version: 3.8.x
-      - name: install sympy (earliest supported version)
-        run: python -m pip install ipython sympy==1.2
+          python-version: 3.6.7
+      - name: install sympy (earliest supported)
+        run: python -m pip install sympy==1.9
       - name: perform unit testing
         run: python -m unittest nrpylatex.tests.test_parse_latex
   sympy_development-ubuntu:
@@ -62,14 +62,12 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
-          python-version: 3.8.x
-      - name: install ipython
-        run: python -m pip install ipython
-      - name: install sympy (latest development version)
+          python-version: 3.x
+      - name: install sympy (latest development)
         run: python -m pip install -U git+https://github.com/sympy/sympy/
       - name: perform unit testing
         run: python -m unittest
@@ -78,16 +76,16 @@ jobs:
     steps:
       - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
       - name: checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.2.2
       - name: install python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.3.0
         with:
-          python-version: 3.8.x
+          python-version: 3.x
       - name: clone nrpy repository
         run: git clone https://github.com/nrpy/nrpy.git
       - name: install dependencies
-        run: cd nrpy && pip install -r requirements-dev.txt
-      - name: upgrade nrpylatex
+        run: cd nrpy && pip install -r requirements.txt
+      - name: upgrade nrpylatex to development
         run: python -m pip install git+https://github.com/nrpy/nrpylatex.git -U
       - name: perform unit testing
         run: cd nrpy && python nrpy/equations/general_relativity/nrpylatex/test_parse_BSSN.py
