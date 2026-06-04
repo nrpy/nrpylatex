@@ -1,11 +1,11 @@
-""" NRPyLaTeX Exceptions """
-# Author: Ken Sible
-# Email:  ksible *at* outlook *dot* com
+"""NRPyLaTeX Exceptions"""
+
 
 class NRPyLaTeXError(Exception):
-
-    def __init__(self, message, sentence=None, position=None):
-        if position is not None:
+    def __init__(
+        self, message: str, sentence: str | None = None, position: int | None = None
+    ) -> None:
+        if position is not None and sentence is not None:
             length = 0
             for _, substring in enumerate(sentence.split('\n')):
                 if position - length <= len(substring):
@@ -13,13 +13,16 @@ class NRPyLaTeXError(Exception):
                     position += len(sentence) - len(substring) - length
                     break
                 length += len(substring) + 1
-            super(NRPyLaTeXError, self).__init__(message
-                + '\n  %s\n%s^' % (sentence, (position + 2) * ' '))
+
+            spacing = ' ' * (position + 2)
+            super().__init__(f'{message}\n  {sentence}\n{spacing}^')
         else:
-            super(NRPyLaTeXError, self).__init__(message)
+            super().__init__(message)
+
 
 class NamespaceError(Exception):
-    """ Illegal Namespace Import """
+    """Illegal Namespace Import"""
+
 
 class DeprecatedWarning(Warning):
-    """ Use of Deprecated Feature """
+    """Use of Deprecated Feature"""

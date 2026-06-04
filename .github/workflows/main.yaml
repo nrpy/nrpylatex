@@ -1,91 +1,56 @@
 name: Python CI
+
 on: [push]
+
 jobs:
-  sympy_stable-ubuntu:
+  pytest:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3']
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install Package Manager
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+      - name: Initialize Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Install Python Dependencies
+        run: uv sync
+      - name: Run Unit Tests
+        run: uv run pytest -s
+
+  sympy_earliest-ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
-      - name: checkout repository
-        uses: actions/checkout@v4.2.2
-      - name: install python
-        uses: actions/setup-python@v5.3.0
+      - name: Checkout Repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install Package Manager
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          python-version: 3.x
-      - name: install sympy (latest stable)
-        run: python -m pip install sympy
-      - name: perform unit testing
-        run: python -m unittest
-  sympy_stable-windows:
-    runs-on: windows-latest
-    steps:
-      - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
-      - name: checkout repository
-        uses: actions/checkout@v4.2.2
-      - name: install python
-        uses: actions/setup-python@v5.3.0
-        with:
-          python-version: 3.x
-      - name: install sympy (latest stable)
-        run: python -m pip install sympy
-      - name: perform unit testing
-        run: python -m unittest
-  sympy_stable-macos:
-    runs-on: macos-latest
-    steps:
-      - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
-      - name: checkout repository
-        uses: actions/checkout@v4.2.2
-      - name: install python
-        uses: actions/setup-python@v5.3.0
-        with:
-          python-version: 3.x
-      - name: install sympy (latest stable)
-        run: python -m pip install sympy
-      - name: perform unit testing
-        run: python -m unittest
-  sympy_earliest-ubuntu:
-    runs-on: ubuntu-20.04
-    steps:
-      - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
-      - name: checkout repository
-        uses: actions/checkout@v4.2.2
-      - name: install python
-        uses: actions/setup-python@v5.3.0
-        with:
-          python-version: 3.6.7
-      - name: install sympy (earliest supported)
-        run: python -m pip install sympy==1.9
-      - name: perform unit testing
-        run: python -m unittest nrpylatex.tests.test_parse_latex
+          enable-cache: true
+      - name: Initialize Python 3.6.7
+        run: uv python install 3.6.7
+      - name: Install Python Dependencies
+        run: uv sync --with "sympy==1.9"
+      - name: Run Unit Tests
+        run: uv run --python 3.6.7 pytest -s nrpylatex/tests/test_parse_latex.py
+
   sympy_development-ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
-      - name: checkout repository
-        uses: actions/checkout@v4.2.2
-      - name: install python
-        uses: actions/setup-python@v5.3.0
+      - name: Checkout Repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install Package Manager
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          python-version: 3.x
-      - name: install sympy (latest development)
-        run: python -m pip install -U git+https://github.com/sympy/sympy/
-      - name: perform unit testing
-        run: python -m unittest
-  test_nrpy_bssn-ubuntu:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "checking out branch ${{ github.ref }} on ${{ github.repository }}."
-      - name: checkout repository
-        uses: actions/checkout@v4.2.2
-      - name: install python
-        uses: actions/setup-python@v5.3.0
-        with:
-          python-version: 3.x
-      - name: clone nrpy repository
-        run: git clone https://github.com/nrpy/nrpy.git
-      - name: install dependencies
-        run: cd nrpy && pip install -r requirements.txt
-      - name: upgrade nrpylatex to development
-        run: python -m pip install git+https://github.com/nrpy/nrpylatex.git -U
-      - name: perform unit testing
-        run: cd nrpy && python nrpy/equations/general_relativity/nrpylatex/test_parse_BSSN.py
+          enable-cache: true
+      - name: Initialize Python 3
+        run: uv python install 3
+      - name: Install Python Dependencies
+        run: uv sync --with "sympy @ git+https://github.com/sympy/sympy.git"
+      - name: Run Unit Tests
+        run: uv run pytest -s

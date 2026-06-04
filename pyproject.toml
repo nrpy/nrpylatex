@@ -1,12 +1,18 @@
-[tool.poetry]
+[project]
 name = "nrpylatex"
-version = "1.4.0"
+version = "1.5.0"
 description = "LaTeX Interface to SymPy (CAS) for General Relativity"
-license = "BSD-2-Clause"
-authors = ["Ken Sible <ksible@outlook.com>"]
 readme = "README.md"
-homepage = "https://github.com/nrpy/nrpylatex"
+license = { text = "BSD-2-Clause" }
+authors = [{ name = "Ken Sible", email = "ksible@outlook.com" }]
+requires-python = ">=3.6"
+dependencies = ["sympy>=1.9,<2.0"]
+
+keywords = []
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
@@ -16,37 +22,39 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy",
     "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Text Processing :: Markup :: LaTeX",
-    "Topic :: Software Development :: Code Generators"
+    "Topic :: Software Development :: Code Generators",
 ]
-include = ["LICENSE"]
 
-[tool.poetry.dependencies]
-python = "^3.6"
-sympy = "^1.9"
-ipython = { version = "^8.30.0", python = ">=3.10", optional = true }
+[project.urls]
+homepage = "https://github.com/nrpy/nrpylatex"
+source = "https://github.com/nrpy/nrpylatex"
+issues = "https://github.com/nrpy/nrpylatex/issues"
+changelog = "https://github.com/nrpy/nrpylatex/releases"
 
-[tool.poetry.group.dev]
-optional = true
+[project.optional-dependencies]
+jupyter = ['ipython>=7.16.0']
 
-[tool.poetry.group.dev.dependencies]
-mypy = { version = "^1.13.0", python = ">=3.10" }
-ruff = { version = "^0.8.3", python = ">=3.10" }
-black = { version = "^24.10.0", python = ">=3.10" }
-
-[tool.poetry.extras]
-jupyter = ["ipython"]
-
-[tool.black]
-skip-string-normalization = true
-line-length = 100
+[dependency-groups]
+dev = [
+    "ruff>=0.15.15; python_version >= '3.10'",
+    "mypy>=2.1.0; python_version >= '3.10'",
+    "pytest>=9.0.3; python_version >= '3.10'",
+]
 
 [tool.ruff]
-extend-select = ["I"]
 line-length = 100
 
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.format]
+quote-style = "single"
+
 [tool.mypy]
+strict = true
 ignore_missing_imports = true
+disable_error_code = ["no-untyped-call"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling>=1.30.1"]
+build-backend = "hatchling.build"

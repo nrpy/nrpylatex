@@ -1,72 +1,60 @@
-""" NRPyLaTeX: LaTeX Interface to SymPy (CAS) for General Relativity """
-# Author: Ken Sible
-# Email:  ksible *at* outlook *dot* com
+from typing import Any, Iterator
 
-from nrpylatex.core.parser import Parser
-from nrpylatex.utils.exceptions import NRPyLaTeXError, NamespaceError
-from nrpylatex.utils.structures import IndexedSymbol
-from sympy import Function, Symbol
-from inspect import currentframe
-import re
+from sympy import Expr, Function, Symbol
 
-def parse_latex(sentence, reset=False, debug=False, namespace=None):
-    """ Convert LaTeX to SymPy
+from .core.parser import Parser
+from .utils.exceptions import NamespaceError
+from .utils.structures import IndexedSymbol
 
-        :arg: latex sentence (str)
-        :arg: reset namespace (bool)
-        :arg: debug parse_latex (bool)
-        :arg: import namespace (dict)
-        :return: namespace or expression
-    """
-    if reset: Parser.initialize(reset=True)
+
+class ParsedNamespace:
+    def __init__(self, variables: dict[str, Any], overridden: list[str]) -> None:
+        self._variables = variables
+        self._overridden = overridden
+        for key, value in variables.items():
+            setattr(self, key, value)
+
+    def __iter__(self) -> Iterator[str]:
+        for symbol in self._variables:
+            yield ('*' if symbol in self._overridden else '') + str(symbol)
+
+    def __repr__(self) -> str:
+        return f'ParsedNamespace({", ".join(self._variables.keys())})'
+
+
+def parse_latex(
+    sentence: str, reset: bool = False, debug: bool = False, namespace: dict[str, Any] | None = None
+) -> Expr | ParsedNamespace:
+    if reset:
+        Parser.initialize(reset=True)
+
     if namespace:
-        for symbol in namespace:
+        for symbol, structure in namespace.items():
             function = Function('Tensor')(Symbol(symbol, real=True))
-            structure = namespace[symbol]
             if not isinstance(structure, list):
-                raise NamespaceError('cannot import variable of type %s, only list' % type(structure))
+                raise NamespaceError(f'cannot import variable of type {type(structure)}, only list')
             dimension = len(structure)
             i = 0
-            while isinstance(structure[i], list):
-                if len(structure[i] != dimension):
-                    raise NamespaceError('inconsistent dimension in \'%s\'' % symbol)
+            while i < len(structure) and isinstance(structure[i], list):
+                if len(structure[i]) != dimension:
+                    raise NamespaceError(f"inconsistent dimension in '{symbol}'")
                 i += 1
             Parser._namespace[symbol] = IndexedSymbol(function, dimension, structure)
 
     state = tuple(Parser._namespace.keys())
-    namespace = Parser(debug).parse_latex(sentence)
-    if not isinstance(namespace, dict):
-        return namespace
-    if not namespace: return None
+    parsed_result = Parser(debug).parse_latex(sentence)
 
-    frame = currentframe().f_back
-    for key in namespace:
-        if isinstance(namespace[key], IndexedSymbol):
-            frame.f_globals[key] = namespace[key].structure
-        elif isinstance(namespace[key], Function('Constant')):
-            frame.f_globals[key] = namespace[key].args[0]
+    if not isinstance(parsed_result, dict):
+        return parsed_result
 
-    overridden = [key for key in state if key in namespace]
-    return tuple(('*' if symbol in overridden else '')
-        + str(symbol) for symbol in namespace.keys())
+    extracted_vars: dict[str, Any] = {}
+    for key, value in parsed_result.items():
+        if isinstance(value, IndexedSymbol):
+            extracted_vars[key] = value.structure
+        elif isinstance(value, Function('Constant')):
+            extracted_vars[key] = value.args[0]
+        else:
+            extracted_vars[key] = value
 
-class ParseOutput(tuple):
-    """ Output Structure for IPython (Jupyter) """
-
-    def __init__(self, iterable, sentence):
-        self.iterable = iterable
-        self.sentence = sentence
-
-    def __new__(cls, iterable, sentence):
-        return super(ParseOutput, cls).__new__(cls, iterable)
-
-    def __eq__(self, other):
-        return self.iterable == other.iterable and \
-            self.sentence == other.sentence
-
-    def __ne__(self, other):
-        return self.iterable != other.iterable and \
-            self.sentence != other.sentence
-
-    def _repr_latex_(self):
-        return r'\[' + self.sentence + r'\]'
+    overridden = [key for key in state if key in parsed_result]
+    return ParsedNamespace(extracted_vars, overridden)

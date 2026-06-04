@@ -1,45 +1,42 @@
-""" NRPyLaTeX: LaTeX Interface to SymPy (CAS) for General Relativity """
-# Author: Ken Sible
-# Email:  ksible *at* outlook *dot* com
+import re
+from typing import Any
 
-from IPython.core.magic import Magics, magics_class, line_cell_magic
+from IPython.core.magic import Magics, line_cell_magic, magics_class
+
+from ..parse_latex import ParsedNamespace, parse_latex
+from ..utils.exceptions import NRPyLaTeXError
+
+
+class IPythonNamespace(ParsedNamespace):
+    def __init__(self, parsed_ns: ParsedNamespace, sentence: str) -> None:
+        super().__init__(parsed_ns._variables, parsed_ns._overridden)
+        self.sentence = sentence
+
+    def _repr_latex_(self) -> str:
+        return rf'\[{self.sentence}\]'
+
 
 @magics_class
 class ParseMagic(Magics):
-    """ NRPyLaTeX IPython Magic """
+    """NRPyLaTeX IPython Magic"""
 
     @line_cell_magic
-    def parse_latex(self, line, cell=None):
-        match, kwargs = re.match(r'\s*--([^\s]+)\s*', line), []
+    def parse_latex(self, line: str, cell: str | None = None) -> Any:
+        match = re.match(r'\s*--([^\s]+)\s*', line)
+
+        kwargs: list[str] = []
         while match:
             kwargs.append(match.group(1))
-            line = line[match.span()[-1]:]
+            line = line[match.span()[-1] :]
             match = re.match(r'\s*--([^\s]+)\s*', line)
-
-        debug = False
-        for arg in kwargs:
-            if arg == 'reset':
-                Parser.initialize(reset=True)
-            elif arg == 'debug':
-                debug = True
+        reset, debug = 'reset' in kwargs, 'debug' in kwargs
 
         try:
             sentence = line if cell is None else cell
-            state = tuple(Parser._namespace.keys())
-            namespace = Parser(debug).parse_latex(sentence)
-            if not isinstance(namespace, dict):
-                return namespace
-            if not namespace: return None
-
-            for key in namespace:
-                if isinstance(namespace[key], IndexedSymbol):
-                    self.shell.user_ns[key] = namespace[key].structure
-                elif isinstance(namespace[key], Function('Constant')):
-                    self.shell.user_ns[key] = namespace[key].args[0]
-
-            overridden = [key for key in state if key in namespace]
-            return ParseOutput((('*' if symbol in overridden else '')
-                + str(symbol) for symbol in namespace.keys()), sentence)
+            result = parse_latex(sentence, reset=reset, debug=debug)
+            if not isinstance(result, ParsedNamespace):
+                return result
+            return IPythonNamespace(result, sentence)
 
         except NRPyLaTeXError as e:
-            print(type(e).__name__ + ': ' + str(e))
+            print(f'{type(e).__name__}: {e}')
