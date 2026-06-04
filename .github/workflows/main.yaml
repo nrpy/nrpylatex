@@ -8,7 +8,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3']
+        python-version: ['3.14']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -18,7 +18,7 @@ jobs:
           enable-cache: true
       - name: Initialize Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
-      - name: Install Python Dependencies
+      - name: Install Dependencies
         run: uv sync
       - name: Run Unit Tests
         run: uv run pytest -s
@@ -32,15 +32,24 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
-      - name: Initialize Python 3.6.7
-        run: uv python install 3.6.7
-      - name: Install Python Dependencies
-        run: uv sync --with "sympy==1.9"
+      - name: Setup Python 3.6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.6'
+      - name: Initialize Python 3.6
+        run: uv venv --python python
+      - name: Install Dependencies
+        run: |
+          uv pip install "sympy==1.9" pytest
+          uv pip install -e .
       - name: Run Unit Tests
-        run: uv run --python 3.6.7 pytest -s nrpylatex/tests/test_parse_latex.py
+        run: uv run --with "sympy==1.9" pytest -s
 
   sympy_development-ubuntu:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -48,9 +57,9 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
-      - name: Initialize Python 3
-        run: uv python install 3
-      - name: Install Python Dependencies
-        run: uv sync --with "sympy @ git+https://github.com/sympy/sympy.git"
+      - name: Initialize Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Install Dependencies
+        run: uv sync
       - name: Run Unit Tests
-        run: uv run pytest -s
+        run: uv run --with "sympy @ git+https://github.com/sympy/sympy.git" pytest -s
