@@ -1145,8 +1145,10 @@ class Parser:
                                 idx_gen = IndexedSymbol.index_count()
                                 for idx_i, index_val in enumerate(indexing_LHS):
                                     if index_val in indexing_LHS[:idx_i]:
-                                        indexing_LHS[idx_i] = next(
-                                            x for x in idx_gen if x not in indexing_LHS
+                                        indexing_LHS[idx_i] = indexing_RHS[idx_i] = next(
+                                            x
+                                            for x in idx_gen
+                                            if x not in indexing_LHS and x not in indexing_RHS
                                         )
                                 function_LHS = Function('Tensor')(
                                     function.args[0], *(Symbol(i) for i in indexing_LHS)
@@ -1323,7 +1325,9 @@ class Parser:
                     index_str = f'\\{index_str}'
                 impsum = '' if tensor.impsum else ' % noimpsum'
                 self.parse_latex(
-                    f'\\partial_{{{index_str}}} {LHS.strip()} = \\partial_{{{index_str}}} ({RHS.rstrip(" \n\\\\")}){impsum}'
+                    '\\partial_{{{}}} {} = \\partial_{{{}}} ({}){}'.format(
+                        index_str, LHS.strip(), index_str, RHS.rstrip(' \n\\\\'), impsum
+                    )
                 )
         function = Function('Tensor')(Symbol(symbol, real=True), *indices)
         if symbol not in self._namespace:

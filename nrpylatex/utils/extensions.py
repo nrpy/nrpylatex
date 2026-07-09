@@ -4,7 +4,7 @@ from typing import Any
 from IPython.core.magic import Magics, line_cell_magic, magics_class
 
 from ..parse_latex import ParsedNamespace, parse_latex
-from ..utils.exceptions import NRPyLaTeXError
+from .exceptions import NRPyLaTeXError
 
 
 class IPythonNamespace(ParsedNamespace):

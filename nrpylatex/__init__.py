@@ -10,7 +10,7 @@ from .utils.structures import IndexedSymbol, IndexedSymbolError
 try:
     from IPython.core.interactiveshell import InteractiveShell
 
-    from nrpylatex.utils.ipython import ParseMagic
+    from nrpylatex.utils.extensions import ParseMagic
 
     def load_ipython_extension(ipython: InteractiveShell) -> None:
         ipython.register_magics(ParseMagic)
