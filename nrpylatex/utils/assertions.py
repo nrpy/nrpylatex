@@ -2,7 +2,7 @@
 
 import random
 import sys
-from typing import Any
+from typing import Any, Dict, List, Tuple, Union
 
 import sympy as sp
 from mpmath import fabs, log10, mp, mpc, mpf
@@ -10,7 +10,7 @@ from mpmath import fabs, log10, mp, mpc, mpf
 precision = 30
 
 
-def expand_vardict(vardict: dict[str, Any]) -> dict[str, Any]:
+def expand_vardict(vardict: Dict[str, Any]) -> Dict[str, Any]:
     if all(not isinstance(val, list) for val in vardict.values()):
         return vardict
     for var, val in vardict.items():
@@ -26,9 +26,9 @@ def expand_vardict(vardict: dict[str, Any]) -> dict[str, Any]:
 
 
 def compute_value(
-    symdict: dict[sp.Basic, Any],
-    replaced: list[tuple[sp.Symbol, sp.Expr]],
-    reduced_list: list[sp.Expr],
+    symdict: Dict[sp.Basic, Any],
+    replaced: List[Tuple[sp.Symbol, sp.Expr]],
+    reduced_list: List[sp.Expr],
     factor: int,
 ) -> Any:
     # determine the precision for floating point arithmetic
@@ -54,11 +54,11 @@ def compute_value(
     return value
 
 
-def update_vardict(vardict: dict[str, Any]) -> dict[str, Any]:
+def update_vardict(vardict: Dict[str, Any]) -> Dict[str, Any]:
     # expand vardict into component mapping
     vardict = expand_vardict(vardict)
     # extract every free symbol present in vardict
-    symdict: dict[sp.Basic, Any] = {
+    symdict: Dict[sp.Basic, Any] = {
         symbol: None
         for var in vardict
         if isinstance(vardict[var], sp.Basic)
@@ -87,7 +87,9 @@ def update_vardict(vardict: dict[str, Any]) -> dict[str, Any]:
 
 
 def assert_equal(
-    vardict_1: dict[str, Any] | Any, vardict_2: dict[str, Any] | Any, suppress_message: bool = False
+    vardict_1: Union[Dict[str, Any], Any],
+    vardict_2: Union[Dict[str, Any], Any],
+    suppress_message: bool = False,
 ) -> None:
     """Assert SymPy Expression Equality
 

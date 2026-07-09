@@ -1,4 +1,4 @@
-from typing import Any, Iterator
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 from sympy import Expr, Function, Symbol
 
@@ -8,7 +8,7 @@ from .utils.structures import IndexedSymbol
 
 
 class ParsedNamespace:
-    def __init__(self, variables: dict[str, Any], overridden: list[str]) -> None:
+    def __init__(self, variables: Dict[str, Any], overridden: List[str]) -> None:
         self._variables = variables
         self._overridden = overridden
         for key, value in variables.items():
@@ -23,8 +23,11 @@ class ParsedNamespace:
 
 
 def parse_latex(
-    sentence: str, reset: bool = False, debug: bool = False, namespace: dict[str, Any] | None = None
-) -> Expr | ParsedNamespace:
+    sentence: str,
+    reset: bool = False,
+    debug: bool = False,
+    namespace: Optional[Dict[str, Any]] = None,
+) -> Union[Expr, ParsedNamespace]:
     if reset:
         Parser.initialize(reset=True)
 
@@ -47,7 +50,7 @@ def parse_latex(
     if not isinstance(parsed_result, dict):
         return parsed_result
 
-    extracted_vars: dict[str, Any] = {}
+    extracted_vars: Dict[str, Any] = {}
     for key, value in parsed_result.items():
         if isinstance(value, IndexedSymbol):
             extracted_vars[key] = value.structure

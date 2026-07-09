@@ -125,8 +125,7 @@ def test_example_BSSN() -> None:
                 + \frac{1}{2} \Delta^k \left(\Delta_{ijk} + \Delta_{jik}\right) \\%
                 &\qquad+ \bar{\gamma}^{kl} \left(\Delta^m_{ki} \Delta_{jml} + \Delta^m_{kj} \Delta_{iml} + \Delta^m_{ik} \Delta_{mjl}\right)
         \end{align}
-    """,
-        debug=True,
+    """
     )
     rhs = BSSN_RHSs.BSSN_RHSs['Cartesian_RbarDD_gridfunctions']
     (

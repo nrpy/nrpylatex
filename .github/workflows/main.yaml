@@ -12,16 +12,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        python-version: ['3.8', '3.10', '3.14']
-        include:
-          - os: windows-latest
-            python-version: '3.10'
-          - os: macos-latest
-            python-version: '3.10'
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.14']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Enable Long Paths (Windows Only)
+        if: matrix.os == 'windows-latest'
+        run: git config --system core.longpaths true
       - name: Initialize Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
@@ -47,7 +45,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install "sympy==1.9" pytest
+          python -m pip install "nrpy @ git+https://github.com/nrpy/nrpy.git" "sympy==1.9" pytest
           python -m pip install -e .
       - name: Run Unit Tests
         run: pytest -s
@@ -57,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.10', '3.14']
+        python-version: ['3.10', '3.14']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

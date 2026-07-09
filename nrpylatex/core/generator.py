@@ -1,7 +1,7 @@
 import math
 import re
 from itertools import chain
-from typing import Any
+from typing import Any, Dict, List, Optional, Tuple
 
 from sympy import Add, Derivative, Function, Symbol, srepr
 
@@ -11,12 +11,12 @@ from ..utils.structures import ExprTree, IndexedSymbol
 
 class Generator:
     def __init__(self, parser: Any) -> None:
-        self._namespace: dict[str, Any] = parser._namespace
-        self._property: dict[str, Any] = parser._property
+        self._namespace: Dict[str, Any] = parser._namespace
+        self._property: Dict[str, Any] = parser._property
 
     def generate(
         self, LHS: Any, RHS: Any, impsum: bool = True
-    ) -> tuple[dict[str, Any], int | None, str | None]:
+    ) -> Tuple[Dict[str, Any], Optional[int], Optional[str]]:
         # perform implied summation on indexed expression
         LHS_RHS, dimension, suffix = self.expand_summation(LHS, RHS, impsum)
         if self._property['debug']:
@@ -46,7 +46,7 @@ class Generator:
 
     def expand_summation(
         self, LHS: Any, RHS: Any, impsum: bool = True
-    ) -> tuple[str, int | None, str | None]:
+    ) -> Tuple[str, Optional[int], Optional[str]]:
         tree, indexing = ExprTree(LHS), []
         for subtree in tree.preorder():
             subexpr = subtree.expr
@@ -68,7 +68,7 @@ class Generator:
             else list(dict.fromkeys([(str(idx), pos) for idx, pos in indexing]))
         )
         # construct a tuple list of every RHS free index
-        free_index_RHS: list[Any] = []
+        free_index_RHS: List[Any] = []
 
         iterable = RHS.args if RHS.func == Add else [RHS]
         LHS, RHS = IndexedSymbol(LHS).array_format(LHS), srepr(RHS)
@@ -213,10 +213,10 @@ class Generator:
 
     @staticmethod
     def separate_indexing(
-        indexing: list[tuple[Any, Any]], symbol_LHS: str, impsum: bool = True
-    ) -> tuple[list[tuple[str, str]], list[str]]:
-        free_index: list[tuple[str, str]] = []
-        bound_index: list[str] = []
+        indexing: List[Tuple[Any, Any]], symbol_LHS: str, impsum: bool = True
+    ) -> Tuple[List[Tuple[str, str]], List[str]]:
+        free_index: List[Tuple[str, str]] = []
+        bound_index: List[str] = []
         str_indexing = [(str(idx), pos) for idx, pos in indexing]
         # iterate over every unique index in the subexpression
         for index in list(dict.fromkeys([idx for idx, _ in str_indexing])):
@@ -245,7 +245,7 @@ class Generator:
         return list(dict.fromkeys(free_index)), bound_index
 
     @staticmethod
-    def generate_metric(symbol: str, dimension: int, suffix: str | None) -> str:
+    def generate_metric(symbol: str, dimension: int, suffix: Optional[str]) -> str:
         latex_config = ''
         sym_base = symbol[:-2]
         fact = math.factorial(dimension - 1)
@@ -291,7 +291,7 @@ class Generator:
         return latex_config
 
     @staticmethod
-    def generate_connection(symbol: str, diacritic: str | None) -> str:
+    def generate_connection(symbol: str, diacritic: Optional[str]) -> str:
         metric = rf'\mathrm{{{symbol.rstrip("UD")}}}'
         diac_str = diacritic if diacritic else ''
         return rf'\mathrm{{Gamma{diac_str}}}^{{i_1}}_{{i_2 i_3}} = \frac{{1}}{{2}} {metric}^{{i_1 i_4}} (\partial_{{i_2}} {metric}_{{i_3 i_4}} + \partial_{{i_3}} {metric}_{{i_4 i_2}} - \partial_{{i_4}} {metric}_{{i_2 i_3}})'
@@ -300,9 +300,9 @@ class Generator:
     def generate_covdrv(
         function: Function,
         covdrv_index: Any,
-        symbol: str | None = None,
-        diacritic: str | None = None,
-        dimension: int | None = None,
+        symbol: Optional[str] = None,
+        diacritic: Optional[str] = None,
+        dimension: Optional[int] = None,
     ) -> str:
         indexing = [str(index) for index in function.args[1:]] + [str(covdrv_index)]
         idx_gen = IndexedSymbol.index_count()
@@ -391,6 +391,6 @@ class Generator:
 
 class GeneratorError(NRPyLaTeXError):
     def __init__(
-        self, message: str, sentence: str | None = None, position: int | None = None
+        self, message: str, sentence: Optional[str] = None, position: Optional[int] = None
     ) -> None:
         super().__init__(message, sentence, position)

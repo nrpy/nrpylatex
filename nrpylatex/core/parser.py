@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import re
 from collections import OrderedDict
 from itertools import product
-from typing import Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from sympy import (
     Derivative,
@@ -37,8 +39,8 @@ from ..core.scanner import Scanner
 from ..utils.exceptions import NRPyLaTeXError
 from ..utils.structures import CoordinateSystem, ExprTree, IndexedSymbol, symdef
 
-LATIN_ALPHABET: list[str] = [chr(i) for i in range(97, 123)]
-GREEK_ALPHABET: list[str] = [
+LATIN_ALPHABET: List[str] = [chr(i) for i in range(97, 123)]
+GREEK_ALPHABET: List[str] = [
     'alpha',
     'beta',
     'gamma',
@@ -68,9 +70,9 @@ GREEK_ALPHABET: list[str] = [
 
 class Parser:
     _namespace: OrderedDict[str, Any] = OrderedDict()
-    _property: dict[str, Any] = {}
+    _property: Dict[str, Any] = {}
 
-    def __init__(self, debug: bool | int = False) -> None:
+    def __init__(self, debug: Union[bool, int] = False) -> None:
         self.scanner: Scanner = Scanner()
         self.generator: Generator = Generator(self)
         self.state: OrderedDict[str, Any] = OrderedDict()
@@ -108,7 +110,7 @@ class Parser:
             self._replace()
         position, _ = self.scanner.prev_state
         sentence = self.scanner.sentence[position:]
-        stack: list[int] = []
+        stack: List[int] = []
         i = i_1 = i_2 = i_3 = 0
         while i < len(sentence):
             lexeme = sentence[i]
@@ -1082,7 +1084,7 @@ class Parser:
                     self.parse_latex(Generator.generate_connection(metric.symbol, diacritic))
             elif base_symbol == 'epsilon':
                 # instantiate permutation (Levi-Civita) symbol using parity
-                def sgn(sequence: list[int]) -> int:
+                def sgn(sequence: List[int]) -> int:
                     """Permutation Signature (Parity)"""
                     cycle_length = 0
                     for n, i in enumerate(sequence[:-1]):
@@ -1237,7 +1239,7 @@ class Parser:
         raise ParserError(f"unexpected '{sentence[position]}'", sentence, position)
 
     # <INDEXING_3> -> <INDEXING_2> | '{' { <INDEXING_1> }+ '}'
-    def _indexing_3(self) -> list[Any]:
+    def _indexing_3(self) -> List[Any]:
         indexing = []
         if self.accept('LBRACE'):
             while not self.accept('RBRACE'):
@@ -1246,7 +1248,7 @@ class Parser:
         return [self._indexing_2()]
 
     # <INDEXING_4> -> <INDEXING_2> | '{' ( ',' | ';' ) { <INDEXING_1> }+ | { <INDEXING_1> }+ [ ( ',' | ';' ) { <INDEXING_1> }+ ] '}'
-    def _indexing_4(self) -> tuple[list[Any], int]:
+    def _indexing_4(self) -> Tuple[List[Any], int]:
         indexing, order = [], 0
         if self.accept('LBRACE'):
             lexeme = self.scanner.lexeme
@@ -1298,7 +1300,9 @@ class Parser:
         self._namespace[symbol] = tensor
         self.state[symbol] = None
 
-    def _define_pardrv(self, function: Any, location: str, suffix: str | None, index: Any) -> Any:
+    def _define_pardrv(
+        self, function: Any, location: str, suffix: Optional[str], index: Any
+    ) -> Any:
         if suffix is None:
             return Derivative(function, index)
         symbol, indices = str(function.args[0]), list(function.args[1:]) + [index]
@@ -1344,7 +1348,7 @@ class Parser:
 
     def _expand_product(
         self, location: str, suffix_1: str, suffix_2: str, index: Any = None
-    ) -> tuple[list[tuple[str, Any]], Any]:
+    ) -> Tuple[List[Tuple[str, Any]], Any]:
         func_list, product_result = [], None
         if any(self.peek(i) for i in ('LPAREN', 'LBRACK', 'LBRACE')):
             subexpr = self._subexpr()
@@ -1440,6 +1444,6 @@ class Parser:
 
 class ParserError(NRPyLaTeXError):
     def __init__(
-        self, message: str, sentence: str | None = None, position: int | None = None
+        self, message: str, sentence: Optional[str] = None, position: Optional[int] = None
     ) -> None:
         super().__init__(message, sentence, position)

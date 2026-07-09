@@ -1,6 +1,6 @@
 import re
 import warnings
-from typing import Any, Iterator
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from ..utils.exceptions import DeprecatedWarning, NRPyLaTeXError
 
@@ -10,8 +10,8 @@ class Scanner:
     position: int
     eqn_mode: bool
     lexeme: str
-    token: str | None
-    prev_state: tuple[int, bool]
+    token: Optional[str]
+    prev_state: Tuple[int, bool]
 
     def __init__(self) -> None:
         symmetry = r'nosym|(?:sym|anti)[0-9]+(?:_(?:sym|anti)[0-9]+)*'
@@ -52,7 +52,7 @@ class Scanner:
                 r'[a-zA-Z]',
             )
         )
-        self.deprecated: list[tuple[str, str]] = [('\\text', '\\mathrm')]
+        self.deprecated: List[Tuple[str, str]] = [('\\text', '\\mathrm')]
 
         token_dict_cfg = [
             ('LINEBREAK', r'\r?\n'),
@@ -82,7 +82,7 @@ class Scanner:
         self.pattern_cfg: re.Pattern[str] = re.compile(
             '|'.join([f'(?P<{k}>{v})' for k, v in token_dict_cfg])
         )
-        self.token_dict_cfg: dict[str, str] = dict(token_dict_cfg)
+        self.token_dict_cfg: Dict[str, str] = dict(token_dict_cfg)
 
         token_dict_eqn = [
             ('LINEBREAK', r'\r?\n'),
@@ -134,9 +134,9 @@ class Scanner:
         self.pattern_eqn: re.Pattern[str] = re.compile(
             '|'.join([f'(?P<{k}>{v})' for k, v in token_dict_eqn])
         )
-        self.token_dict_eqn: dict[str, str] = dict(token_dict_eqn)
+        self.token_dict_eqn: Dict[str, str] = dict(token_dict_eqn)
 
-    def initialize(self, sentence: str, state: tuple[int, bool] | None = None) -> None:
+    def initialize(self, sentence: str, state: Optional[Tuple[int, bool]] = None) -> None:
         while True:
             sentence_ = re.sub(
                 r'\\mathrm{([^{}]*)\\mathrm{([^{}]+)}([^{}]*)}', r'\\mathrm{\1\2\3}', sentence
@@ -186,7 +186,7 @@ class Scanner:
                 self.eqn_mode = True
             yield lastgroup
 
-    def lex(self) -> str | None:
+    def lex(self) -> Optional[str]:
         try:
             self.token = next(self.tokenize())
         except StopIteration:
@@ -195,7 +195,7 @@ class Scanner:
             self.prev_state = (self.position, self.eqn_mode)
         return self.token
 
-    def reset(self, state: tuple[int, bool]) -> None:
+    def reset(self, state: Tuple[int, bool]) -> None:
         if not hasattr(self, 'sentence') or not self.sentence:
             raise RuntimeError('cannot reset uninitialized scanner')
         self.initialize(self.sentence, state)
@@ -217,6 +217,6 @@ class Scanner:
 
 class ScannerError(NRPyLaTeXError):
     def __init__(
-        self, message: str, sentence: str | None = None, position: int | None = None
+        self, message: str, sentence: Optional[str] = None, position: Optional[int] = None
     ) -> None:
         super().__init__(message, sentence, position)

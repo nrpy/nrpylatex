@@ -1,4 +1,10 @@
-import importlib
+import sys
+
+if sys.version_info >= (3, 8):
+    import importlib.metadata as importlib_metadata
+else:
+    import importlib_metadata
+
 
 from .core.generator import Generator, GeneratorError
 from .core.parser import Parser, ParserError
@@ -17,7 +23,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-__version__ = importlib.metadata.version('nrpylatex')
+__version__ = importlib_metadata.version('nrpylatex')
 
 __all__ = [
     'Generator',

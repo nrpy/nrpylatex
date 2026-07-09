@@ -1,9 +1,11 @@
 """NRPyLaTeX Exceptions"""
 
+from typing import Optional
+
 
 class NRPyLaTeXError(Exception):
     def __init__(
-        self, message: str, sentence: str | None = None, position: int | None = None
+        self, message: str, sentence: Optional[str] = None, position: Optional[int] = None
     ) -> None:
         if position is not None and sentence is not None:
             length = 0

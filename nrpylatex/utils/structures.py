@@ -1,9 +1,16 @@
 """Expression Trees, Coordinate Systems and Indexed Symbols"""
 
+import sys
+
+if sys.version_info >= (3, 8):
+    from typing import SupportsIndex
+else:
+    from typing_extensions import SupportsIndex
+
 import re
 import sys
 from itertools import product
-from typing import Any, Iterator, List, Optional, SupportsIndex, Tuple, Union, overload
+from typing import Any, Iterator, List, Optional, Tuple, Union, overload
 
 from sympy import Function, Symbol, sympify
 
@@ -130,7 +137,7 @@ class ExprTree:
     __str__ = __repr__
 
 
-class CoordinateSystem(list[Symbol]):
+class CoordinateSystem(List[Symbol]):
     def __init__(self, symbol: str) -> None:
         self.symbol = symbol
 
