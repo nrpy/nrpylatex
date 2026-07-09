@@ -5,7 +5,7 @@ description = "LaTeX Interface to SymPy (CAS) for General Relativity"
 readme = "README.md"
 license = { text = "BSD-2-Clause" }
 authors = [{ name = "Ken Sible", email = "ksible@outlook.com" }]
-requires-python = ">=3.6"
+requires-python = ">=3.7"
 dependencies = ["sympy>=1.9,<2.0"]
 
 keywords = []
@@ -36,10 +36,10 @@ jupyter = ['ipython>=7.16.0']
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.15; python_version >= '3.10'",
-    "mypy>=2.1.0; python_version >= '3.10'",
-    "pytest>=7.0,<9.0; python_version < '3.10'",
-    "pytest>=9.0.3; python_version >= '3.10'",
+    "nrpy @ https://github.com/nrpy/nrpy.git",
+    "mypy>=2.2.0; python_version >= '3.10'",
+    "ruff>=0.15.20; python_version >= '3.10'",
+    "pytest>=9.1.1; python_version >= '3.10'",
 ]
 
 [tool.ruff]
@@ -56,6 +56,9 @@ strict = true
 ignore_missing_imports = true
 disable_error_code = ["no-untyped-call"]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [build-system]
-requires = ["hatchling>=1.24"]
+requires = ["hatchling>=1.17.0"]
 build-backend = "hatchling.build"
