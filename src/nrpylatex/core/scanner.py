@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import warnings
-from typing import Iterator
+from collections.abc import Iterator
 
 from ..utils.exceptions import DeprecatedWarning, NRPyLaTeXError
 

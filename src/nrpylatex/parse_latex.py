@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from inspect import currentframe
-from typing import Any, Iterator
+from typing import Any
 
 from sympy import Expr, Function, Symbol
 

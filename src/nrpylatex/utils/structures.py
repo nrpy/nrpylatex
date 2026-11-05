@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import sys
-
-if sys.version_info >= (3, 8):
-    from typing import SupportsIndex
-else:
-    from typing_extensions import SupportsIndex
-
 import re
 import sys
+from collections.abc import Iterator
 from itertools import product
-from typing import Any, Iterator, cast, overload
+from typing import Any, SupportsIndex, cast, overload
 
 from sympy import Function, Symbol, sympify
 
