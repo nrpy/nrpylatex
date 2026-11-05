@@ -1,9 +1,11 @@
-dist/
-build/
-*.egg-info/
+.DS_Store
 __pycache__/
+.ruff_cache/
 .mypy_cache/
+.pytest_cache/
 .vscode/
 .venv/
-*.ipynb
 *.pyc
+*.egg-info/
+dist/
+build/

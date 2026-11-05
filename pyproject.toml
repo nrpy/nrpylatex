@@ -3,7 +3,7 @@ name = "nrpylatex"
 version = "1.5.0"
 description = "LaTeX Interface to SymPy (CAS) for General Relativity"
 readme = "README.md"
-license = { text = "BSD-2-Clause" }
+license = { file = "LICENSE" }
 authors = [{ name = "Ken Sible", email = "ksible@outlook.com" }]
 requires-python = ">=3.7"
 dependencies = ["sympy>=1.9,<2.0"]
@@ -25,32 +25,36 @@ classifiers = [
     "Topic :: Software Development :: Code Generators",
 ]
 
+[project.optional-dependencies]
+jupyter = ['ipython>=7.16.0']
+
+[dependency-groups]
+dev = ["nrpy @ https://github.com/nrpy/nrpy.git", "ruff", "mypy", "pytest"]
+
 [project.urls]
 homepage = "https://github.com/nrpy/nrpylatex"
 source = "https://github.com/nrpy/nrpylatex"
 issues = "https://github.com/nrpy/nrpylatex/issues"
 changelog = "https://github.com/nrpy/nrpylatex/releases"
 
-[project.optional-dependencies]
-jupyter = ['ipython>=7.16.0']
-
-[dependency-groups]
-dev = ["nrpy @ https://github.com/nrpy/nrpy.git", "mypy", "ruff", "pytest"]
-
 [tool.ruff]
 line-length = 100
+src = ["src"]
 
 [tool.ruff.lint]
-extend-select = ["I"]
+extend-select = ["I", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/**/*.py" = ["S102", "S105", "S307"]
+"tests/**/*.py" = ["S101"]
 
 [tool.ruff.format]
 quote-style = "single"
 
 [tool.mypy]
+files = ["src"]
 strict = true
 ignore_missing_imports = true
-disallow_untyped_decorators = false
-disable_error_code = ["no-untyped-call"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
