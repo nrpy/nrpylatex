@@ -1,5 +1,7 @@
 """Expression Trees, Coordinate Systems and Indexed Symbols"""
 
+from __future__ import annotations
+
 import sys
 
 if sys.version_info >= (3, 8):
@@ -10,7 +12,7 @@ else:
 import re
 import sys
 from itertools import product
-from typing import Any, Iterator, List, Optional, Tuple, Union, overload
+from typing import Any, Iterator, cast, overload
 
 from sympy import Function, Symbol, sympify
 
@@ -31,7 +33,7 @@ class ExprTree:
         self.root = self.Node(expr, None)
         self.build(self.root)
 
-    def build(self, node: 'ExprTree.Node', clear: bool = True) -> None:
+    def build(self, node: ExprTree.Node, clear: bool = True) -> None:
         """Build expression (sub)tree.
 
         :arg:   root node of (sub)tree
@@ -52,7 +54,7 @@ class ExprTree:
             node.append(subtree)
             self.build(subtree)
 
-    def preorder(self, node: Optional['ExprTree.Node'] = None) -> Iterator['ExprTree.Node']:
+    def preorder(self, node: ExprTree.Node | None = None) -> Iterator[ExprTree.Node]:
         """Generate iterator for preorder traversal.
 
         :arg:    root node of (sub)tree
@@ -70,10 +72,9 @@ class ExprTree:
             node = self.root
         yield node
         for child in node.children:
-            for subtree in self.preorder(child):
-                yield subtree
+            yield from self.preorder(child)
 
-    def postorder(self, node: Optional['ExprTree.Node'] = None) -> Iterator['ExprTree.Node']:
+    def postorder(self, node: ExprTree.Node | None = None) -> Iterator[ExprTree.Node]:
         """Generate iterator for postorder traversal.
 
         :arg:    root node of (sub)tree
@@ -90,8 +91,7 @@ class ExprTree:
         if node is None:
             node = self.root
         for child in node.children:
-            for subtree in self.postorder(child):
-                yield subtree
+            yield from self.postorder(child)
         yield node
 
     def reconstruct(self, evaluate: bool = False) -> Any:
@@ -120,9 +120,9 @@ class ExprTree:
         def __init__(self, expr: Any, func: Any) -> None:
             self.expr = expr
             self.func = func
-            self.children: List['ExprTree.Node'] = []
+            self.children: list[ExprTree.Node] = []
 
-        def append(self, node: 'ExprTree.Node') -> None:
+        def append(self, node: ExprTree.Node) -> None:
             self.children.append(node)
 
         def __repr__(self) -> str:
@@ -137,7 +137,7 @@ class ExprTree:
     __str__ = __repr__
 
 
-class CoordinateSystem(List[Symbol]):
+class CoordinateSystem(list[Symbol]):
     def __init__(self, symbol: str) -> None:
         self.symbol = symbol
 
@@ -157,9 +157,9 @@ class CoordinateSystem(List[Symbol]):
     def __getitem__(self, i: SupportsIndex) -> Symbol: ...
 
     @overload
-    def __getitem__(self, s: slice) -> List[Symbol]: ...
+    def __getitem__(self, s: slice) -> list[Symbol]: ...
 
-    def __getitem__(self, i: Union[SupportsIndex, slice]) -> Union[Symbol, List[Symbol]]:
+    def __getitem__(self, i: SupportsIndex | slice) -> Symbol | list[Symbol]:
         try:
             return super().__getitem__(i)
         except IndexError:
@@ -172,20 +172,20 @@ class CoordinateSystem(List[Symbol]):
             re.match(f'{self.symbol}_[0-9][0-9]*', str(key))
         )
 
-    def __eq__(self, other: Any) -> bool:
-        return list.__eq__(self, other) and self.symbol == other.symbol
+    def __eq__(self, other: object) -> bool:
+        return list.__eq__(self, other) and self.symbol == cast(CoordinateSystem, other).symbol
 
 
 class IndexedSymbol:
     def __init__(
         self,
         function: Any,
-        dimension: Optional[int] = None,
-        structure: Optional[Any] = None,
-        equation: Optional[Any] = None,
-        symmetry: Optional[str] = None,
-        suffix: Optional[str] = None,
-        weight: Optional[Any] = None,
+        dimension: int | None = None,
+        structure: Any | None = None,
+        equation: Any | None = None,
+        symmetry: str | None = None,
+        suffix: str | None = None,
+        weight: Any | None = None,
         impsum: bool = True,
     ) -> None:
         self.overridden = False
@@ -206,7 +206,7 @@ class IndexedSymbol:
         self.impsum = impsum
 
     @staticmethod
-    def indexing(function: Any) -> List[Tuple[Any, str]]:
+    def indexing(function: Any) -> list[tuple[Any, str]]:
         """Symbol Indexing from SymPy Function"""
         symbol, indices = function.args[0], function.args[1:]
         i, indexing = len(indices) - 1, []
@@ -219,7 +219,6 @@ class IndexedSymbol:
                 i -= 1
         return list(reversed(indexing))
 
-    # TODO change method type to static (class) method
     def array_format(self, function: Any) -> str:
         """Indexed Symbol Notation for Array Formatting"""
         if isinstance(function, Function('Tensor')):
@@ -291,8 +290,8 @@ class IndexedSymbol:
                 break
 
         latex_0 = symbol
-        latex_1_list: List[str] = []
-        latex_2_list: List[str] = []
+        latex_1_list: list[str] = []
+        latex_2_list: list[str] = []
 
         if len(latex_0) > 1:
             latex_0 = f'\\mathrm{{{latex_0}}}'
@@ -346,10 +345,7 @@ class IndexedSymbolError(Exception):
 
 
 def symdef(
-    rank: int,
-    symbol: Optional[str] = None,
-    symmetry: Optional[str] = None,
-    dimension: Optional[int] = None,
+    rank: int, symbol: str | None = None, symmetry: str | None = None, dimension: int | None = None
 ) -> Any:
     """Generate an indexed symbol of specified rank and dimension
 
@@ -406,21 +402,17 @@ def symdef(
     """
     if not dimension or dimension == -1:
         dimension = 3
-    if symbol is not None:
-        if not isinstance(symbol, str) or not re.match(r'[\w_]', symbol):
-            raise ValueError('symbol must be an alphabetic string')
-    if dimension is not None:
-        if not isinstance(dimension, int) or dimension <= 0:
-            raise ValueError('dimension must be a positive integer')
+    if symbol is not None and (not isinstance(symbol, str) or not re.match(r'[\w_]', symbol)):
+        raise ValueError('symbol must be an alphabetic string')
+    if dimension is not None and (not isinstance(dimension, int) or dimension <= 0):
+        raise ValueError('dimension must be a positive integer')
     indexed_symbol = _init(rank * [dimension], symbol)
     if symmetry:
         return _symmetrize(rank, indexed_symbol, symmetry, dimension)
     return indexed_symbol
 
 
-def _init(
-    shape: Union[int, List[int]], symbol: Optional[str], index: Optional[List[int]] = None
-) -> List[Any]:
+def _init(shape: int | list[int], symbol: str | None, index: list[int] | None = None) -> list[Any]:
     if isinstance(shape, int):
         shape = [shape]
     if not index:
@@ -435,7 +427,7 @@ def _init(
     return iterable
 
 
-def _symmetrize(rank: int, indexed_symbol: List[Any], symmetry: str, dimension: int) -> List[Any]:
+def _symmetrize(rank: int, indexed_symbol: list[Any], symmetry: str, dimension: int) -> list[Any]:
     if rank == 1:
         if symmetry == 'nosym':
             return indexed_symbol
@@ -451,7 +443,7 @@ def _symmetrize(rank: int, indexed_symbol: List[Any], symmetry: str, dimension: 
     return indexed_symbol
 
 
-def _symmetrize_rank2(indexed_symbol: List[Any], symmetry: str, dimension: int) -> List[Any]:
+def _symmetrize_rank2(indexed_symbol: list[Any], symmetry: str, dimension: int) -> list[Any]:
     for sym in symmetry.split('_'):
         sign = 1 if sym[:3] == 'sym' else -1
         for i, j in product(range(dimension), repeat=2):
@@ -467,9 +459,9 @@ def _symmetrize_rank2(indexed_symbol: List[Any], symmetry: str, dimension: int) 
     return indexed_symbol
 
 
-def _symmetrize_rank3(indexed_symbol: List[Any], symmetry: str, dimension: int) -> List[Any]:
+def _symmetrize_rank3(indexed_symbol: list[Any], symmetry: str, dimension: int) -> list[Any]:
     symmetry_str = symmetry
-    symmetry_list: List[str] = []
+    symmetry_list: list[str] = []
     for sym in symmetry_str.split('_'):
         index = 3 if sym[:3] == 'sym' else 4
         if len(sym[index:]) == 3:
@@ -503,9 +495,9 @@ def _symmetrize_rank3(indexed_symbol: List[Any], symmetry: str, dimension: int) 
     return indexed_symbol
 
 
-def _symmetrize_rank4(indexed_symbol: List[Any], symmetry: str, dimension: int) -> List[Any]:
+def _symmetrize_rank4(indexed_symbol: list[Any], symmetry: str, dimension: int) -> list[Any]:
     symmetry_str = symmetry
-    symmetry_list: List[str] = []
+    symmetry_list: list[str] = []
     for sym in symmetry_str.split('_'):
         index = 3 if sym[:3] == 'sym' else 4
         if len(sym[index:]) in (3, 4):

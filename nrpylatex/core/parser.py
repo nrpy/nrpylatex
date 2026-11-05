@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import OrderedDict
 from itertools import product
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from sympy import (
     Derivative,
@@ -39,8 +39,8 @@ from ..core.scanner import Scanner
 from ..utils.exceptions import NRPyLaTeXError
 from ..utils.structures import CoordinateSystem, ExprTree, IndexedSymbol, symdef
 
-LATIN_ALPHABET: List[str] = [chr(i) for i in range(97, 123)]
-GREEK_ALPHABET: List[str] = [
+LATIN_ALPHABET: list[str] = [chr(i) for i in range(97, 123)]
+GREEK_ALPHABET: list[str] = [
     'alpha',
     'beta',
     'gamma',
@@ -69,10 +69,10 @@ GREEK_ALPHABET: List[str] = [
 
 
 class Parser:
-    _namespace: OrderedDict[str, Any] = OrderedDict()
-    _property: Dict[str, Any] = {}
+    _namespace: OrderedDict[str, Any] = OrderedDict()  # noqa: RUF012
+    _property: dict[str, Any] = {}  # noqa: RUF012
 
-    def __init__(self, debug: Union[bool, int] = False) -> None:
+    def __init__(self, debug: bool | int = False) -> None:
         self.scanner: Scanner = Scanner()
         self.generator: Generator = Generator(self)
         self.state: OrderedDict[str, Any] = OrderedDict()
@@ -110,7 +110,7 @@ class Parser:
             self._replace()
         position, _ = self.scanner.prev_state
         sentence = self.scanner.sentence[position:]
-        stack: List[int] = []
+        stack: list[int] = []
         i = i_1 = i_2 = i_3 = 0
         while i < len(sentence):
             lexeme = sentence[i]
@@ -325,8 +325,8 @@ class Parser:
                             break
                         if (j - i + 1) == len(substr_syntax):
                             new_repl = new
-                            for var in varmap:
-                                new_repl = new_repl.replace(var, varmap[var])
+                            for var_name, var in varmap.items():
+                                new_repl = new_repl.replace(var_name, var)
                             i_1, i_2 = index + offset, string_syntax[k][0] + offset
                             old_repl = sentence[i_1:i_2]
                             sentence = sentence[:i_1] + new_repl + sentence[i_2:]
@@ -960,16 +960,10 @@ class Parser:
                 equation[0], equation[3] = equation[0] + latex, equation[3] + latex
             if location == 'RHS' and (self._property['suffix'] or symbol not in self._namespace):
                 with self.scanner.context():
-                    suffix_str = 'DD' if f'{metric}DD' in self._namespace else 'UU'
-                    dimension = self._namespace[metric + suffix_str].dimension
                     if index[1] == 'U':
                         self.parse_latex(''.join(equation))
                     else:
-                        self.parse_latex(
-                            Generator.generate_covdrv(
-                                function, index[0], symbol, diacritic, dimension
-                            )
-                        )
+                        self.parse_latex(Generator.generate_covdrv(function, index[0], diacritic))
         return expression
 
     # <LIEDRV> -> <LIE_SYM> '_' <SYMBOL> ( <OPERATOR> | <SUBEXPR> )
@@ -980,7 +974,6 @@ class Parser:
         func_list, expression = self._expand_product(location, 'ld', vector)
         for symbol, function in func_list:
             if location == 'RHS' and (self._property['suffix'] or symbol not in self._namespace):
-                # sentence, (position, _) = self.scanner.sentence, self.scanner.prev_state # TODO
                 symbol = str(function.args[0])
                 tensor = IndexedSymbol(function, self._namespace[symbol].dimension)
                 tensor.weight = self._namespace[symbol].weight
@@ -1049,9 +1042,8 @@ class Parser:
                     self.scanner.reset(sym_state)
                     return self._operator()
         symbol = ''.join(symbol_list)
-        if symbol in self._namespace:
-            if isinstance(self._namespace[symbol], Function('Constant')):
-                return self._namespace[symbol]
+        if symbol in self._namespace and isinstance(self._namespace[symbol], Function('Constant')):
+            return self._namespace[symbol]
         function = Function('Tensor')(Symbol(symbol, real=True), *indexing)
         tensor = IndexedSymbol(function)
         if symbol not in self._namespace and location == 'RHS':
@@ -1067,9 +1059,7 @@ class Parser:
                     )
                 ]
                 with self.scanner.context():
-                    self.parse_latex(
-                        Generator.generate_metric(metric.symbol, metric.dimension, metric.suffix)
-                    )
+                    self.parse_latex(Generator.generate_metric(metric.symbol, metric.dimension))
             elif base_symbol == 'Gamma':
                 base_symbol = self._property['metric'][diacritic]
                 metric = self._namespace[
@@ -1084,7 +1074,7 @@ class Parser:
                     self.parse_latex(Generator.generate_connection(metric.symbol, diacritic))
             elif base_symbol == 'epsilon':
                 # instantiate permutation (Levi-Civita) symbol using parity
-                def sgn(sequence: List[int]) -> int:
+                def sgn(sequence: list[int]) -> int:
                     """Permutation Signature (Parity)"""
                     cycle_length = 0
                     for n, i in enumerate(sequence[:-1]):
@@ -1239,7 +1229,7 @@ class Parser:
         raise ParserError(f"unexpected '{sentence[position]}'", sentence, position)
 
     # <INDEXING_3> -> <INDEXING_2> | '{' { <INDEXING_1> }+ '}'
-    def _indexing_3(self) -> List[Any]:
+    def _indexing_3(self) -> list[Any]:
         indexing = []
         if self.accept('LBRACE'):
             while not self.accept('RBRACE'):
@@ -1248,7 +1238,7 @@ class Parser:
         return [self._indexing_2()]
 
     # <INDEXING_4> -> <INDEXING_2> | '{' ( ',' | ';' ) { <INDEXING_1> }+ | { <INDEXING_1> }+ [ ( ',' | ';' ) { <INDEXING_1> }+ ] '}'
-    def _indexing_4(self) -> Tuple[List[Any], int]:
+    def _indexing_4(self) -> tuple[list[Any], int]:
         indexing, order = [], 0
         if self.accept('LBRACE'):
             lexeme = self.scanner.lexeme
@@ -1300,9 +1290,7 @@ class Parser:
         self._namespace[symbol] = tensor
         self.state[symbol] = None
 
-    def _define_pardrv(
-        self, function: Any, location: str, suffix: Optional[str], index: Any
-    ) -> Any:
+    def _define_pardrv(self, function: Any, location: str, suffix: str | None, index: Any) -> Any:
         if suffix is None:
             return Derivative(function, index)
         symbol, indices = str(function.args[0]), list(function.args[1:]) + [index]
@@ -1330,7 +1318,7 @@ class Parser:
                 impsum = '' if tensor.impsum else ' % noimpsum'
                 self.parse_latex(
                     '\\partial_{{{}}} {} = \\partial_{{{}}} ({}){}'.format(
-                        index_str, LHS.strip(), index_str, RHS.rstrip(' \n\\\\'), impsum
+                        index_str, LHS.strip(), index_str, RHS.strip().removesuffix(r'\\'), impsum
                     )
                 )
         function = Function('Tensor')(Symbol(symbol, real=True), *indices)
@@ -1348,7 +1336,7 @@ class Parser:
 
     def _expand_product(
         self, location: str, suffix_1: str, suffix_2: str, index: Any = None
-    ) -> Tuple[List[Tuple[str, Any]], Any]:
+    ) -> tuple[list[tuple[str, Any]], Any]:
         func_list, product_result = [], None
         if any(self.peek(i) for i in ('LPAREN', 'LBRACK', 'LBRACE')):
             subexpr = self._subexpr()
@@ -1444,6 +1432,6 @@ class Parser:
 
 class ParserError(NRPyLaTeXError):
     def __init__(
-        self, message: str, sentence: Optional[str] = None, position: Optional[int] = None
+        self, message: str, sentence: str | None = None, position: int | None = None
     ) -> None:
         super().__init__(message, sentence, position)

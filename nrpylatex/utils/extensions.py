@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import re
-from typing import Any, List, Optional
+from typing import Any
 
 from IPython.core.magic import Magics, line_cell_magic, magics_class
 
@@ -21,10 +23,10 @@ class ParseMagic(Magics):
     """NRPyLaTeX IPython Magic"""
 
     @line_cell_magic
-    def parse_latex(self, line: str, cell: Optional[str] = None) -> Any:
+    def parse_latex(self, line: str, cell: str | None = None) -> Any:
         match = re.match(r'\s*--([^\s]+)\s*', line)
 
-        kwargs: List[str] = []
+        kwargs: list[str] = []
         while match:
             kwargs.append(match.group(1))
             line = line[match.span()[-1] :]

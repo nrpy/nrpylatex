@@ -581,11 +581,11 @@ def test_hamiltonian_momentum_contraint() -> None:
 def test_inverse_covariant() -> None:
     for DIM in range(2, 5):
         ns_vars = parse_latex_reset(
-            r"""
+            rf"""
             % declare metric gDD --dim {DIM}
             % declare index latin --dim {DIM}
             T^a_c = g^{{ab}} g_{{bc}}
-        """.format(DIM=DIM)
+        """
         )
         for i in range(DIM):
             for j in range(DIM):
@@ -595,11 +595,11 @@ def test_inverse_covariant() -> None:
 def test_inverse_contravariant() -> None:
     for DIM in range(2, 5):
         ns_vars = parse_latex_reset(
-            r"""
+            rf"""
             % declare metric gUU --dim {DIM}
             % declare index latin --dim {DIM}
             T^a_c = g^{{ab}} g_{{bc}}
-        """.format(DIM=DIM)
+        """
         )
         for i in range(DIM):
             for j in range(DIM):

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import math
 import re
 from itertools import chain
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sympy import Add, Derivative, Function, Symbol, srepr
 
@@ -11,12 +13,12 @@ from ..utils.structures import ExprTree, IndexedSymbol
 
 class Generator:
     def __init__(self, parser: Any) -> None:
-        self._namespace: Dict[str, Any] = parser._namespace
-        self._property: Dict[str, Any] = parser._property
+        self._namespace: dict[str, Any] = parser._namespace
+        self._property: dict[str, Any] = parser._property
 
     def generate(
         self, LHS: Any, RHS: Any, impsum: bool = True
-    ) -> Tuple[Dict[str, Any], Optional[int], Optional[str]]:
+    ) -> tuple[dict[str, Any], int | None, str | None]:
         # perform implied summation on indexed expression
         LHS_RHS, dimension, suffix = self.expand_summation(LHS, RHS, impsum)
         if self._property['debug']:
@@ -28,11 +30,11 @@ class Generator:
             self._property['debug'] += 1
 
         global_env = dict(self._namespace)
-        for key in global_env:
-            if isinstance(global_env[key], IndexedSymbol):
-                global_env[key] = global_env[key].structure
-            if isinstance(global_env[key], Function('Constant')):
-                global_env[key] = global_env[key].args[0]
+        for key, value in global_env.items():
+            if isinstance(value, IndexedSymbol):
+                global_env[key] = value.structure
+            if isinstance(value, Function('Constant')):
+                global_env[key] = value.args[0]
         global_env['coord'] = self._property['coord']
 
         # evaluate every implied summation and update namespace
@@ -46,7 +48,7 @@ class Generator:
 
     def expand_summation(
         self, LHS: Any, RHS: Any, impsum: bool = True
-    ) -> Tuple[str, Optional[int], Optional[str]]:
+    ) -> tuple[str, int | None, str | None]:
         tree, indexing = ExprTree(LHS), []
         for subtree in tree.preorder():
             subexpr = subtree.expr
@@ -56,9 +58,10 @@ class Generator:
                         indexing.append((index, position))
             elif subexpr.func == Derivative:
                 for index, _ in subexpr.args[1:]:
-                    if index not in self._property['coord']:
-                        if re.match(r'[a-zA-Z]+(?:_[0-9]+)?', str(index)):
-                            indexing.append((index, 'D'))
+                    if index not in self._property['coord'] and re.match(
+                        r'[a-zA-Z]+(?:_[0-9]+)?', str(index)
+                    ):
+                        indexing.append((index, 'D'))
 
         symbol_LHS = IndexedSymbol(LHS).symbol
         # construct a tuple list of every LHS free index
@@ -68,7 +71,7 @@ class Generator:
             else list(dict.fromkeys([(str(idx), pos) for idx, pos in indexing]))
         )
         # construct a tuple list of every RHS free index
-        free_index_RHS: List[Any] = []
+        free_index_RHS: list[Any] = []
 
         iterable = RHS.args if RHS.func == Add else [RHS]
         LHS, RHS = IndexedSymbol(LHS).array_format(LHS), srepr(RHS)
@@ -213,10 +216,10 @@ class Generator:
 
     @staticmethod
     def separate_indexing(
-        indexing: List[Tuple[Any, Any]], symbol_LHS: str, impsum: bool = True
-    ) -> Tuple[List[Tuple[str, str]], List[str]]:
-        free_index: List[Tuple[str, str]] = []
-        bound_index: List[str] = []
+        indexing: list[tuple[Any, Any]], symbol_LHS: str, impsum: bool = True
+    ) -> tuple[list[tuple[str, str]], list[str]]:
+        free_index: list[tuple[str, str]] = []
+        bound_index: list[str] = []
         str_indexing = [(str(idx), pos) for idx, pos in indexing]
         # iterate over every unique index in the subexpression
         for index in list(dict.fromkeys([idx for idx, _ in str_indexing])):
@@ -245,7 +248,7 @@ class Generator:
         return list(dict.fromkeys(free_index)), bound_index
 
     @staticmethod
-    def generate_metric(symbol: str, dimension: int, suffix: Optional[str]) -> str:
+    def generate_metric(symbol: str, dimension: int) -> str:
         latex_config = ''
         sym_base = symbol[:-2]
         fact = math.factorial(dimension - 1)
@@ -291,19 +294,13 @@ class Generator:
         return latex_config
 
     @staticmethod
-    def generate_connection(symbol: str, diacritic: Optional[str]) -> str:
+    def generate_connection(symbol: str, diacritic: str | None) -> str:
         metric = rf'\mathrm{{{symbol.rstrip("UD")}}}'
         diac_str = diacritic if diacritic else ''
         return rf'\mathrm{{Gamma{diac_str}}}^{{i_1}}_{{i_2 i_3}} = \frac{{1}}{{2}} {metric}^{{i_1 i_4}} (\partial_{{i_2}} {metric}_{{i_3 i_4}} + \partial_{{i_3}} {metric}_{{i_4 i_2}} - \partial_{{i_4}} {metric}_{{i_2 i_3}})'
 
     @staticmethod
-    def generate_covdrv(
-        function: Function,
-        covdrv_index: Any,
-        symbol: Optional[str] = None,
-        diacritic: Optional[str] = None,
-        dimension: Optional[int] = None,
-    ) -> str:
+    def generate_covdrv(function: Function, covdrv_index: Any, diacritic: str | None = None) -> str:
         indexing = [str(index) for index in function.args[1:]] + [str(covdrv_index)]
         idx_gen = IndexedSymbol.index_count()
         for i, index in enumerate(indexing):
@@ -391,6 +388,6 @@ class Generator:
 
 class GeneratorError(NRPyLaTeXError):
     def __init__(
-        self, message: str, sentence: Optional[str] = None, position: Optional[int] = None
+        self, message: str, sentence: str | None = None, position: int | None = None
     ) -> None:
         super().__init__(message, sentence, position)
