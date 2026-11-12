@@ -1,6 +1,6 @@
 # NRPyLaTeX: A LaTeX interface to computer algebra systems for general relativity
 
-[![CI](https://github.com/nrpy/nrpylatex/actions/workflows/main.yaml/badge.svg)](https://github.com/nrpy/nrpylatex/actions/workflows/main.yaml)
+[![CI](https://github.com/nrpy/nrpylatex/actions/workflows/pytest.yaml/badge.svg)](https://github.com/nrpy/nrpylatex/actions/workflows/pytest.yaml)
 [![PyPI](https://img.shields.io/pypi/v/nrpylatex.svg)](https://pypi.org/project/nrpylatex/)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/nrpy/nrpylatex.git/HEAD?filepath=nrpylatex-tutorial.ipynb)
 [![arXiv](https://img.shields.io/badge/arXiv-2111.05861-B31B1B)](https://arxiv.org/abs/2111.05861)
@@ -38,7 +38,7 @@ pip install nrpylatex
 ...         K &= R^{\alpha \beta \mu \nu} R_{\alpha \beta \mu \nu}
 ...     \end{align}
 ... """)
-('G', 'M', 'c', 'gDD', 'r', 'theta', 'epsilonUUUU', 'gdet', 'gUU', 'GammaUDD', 'RUDDD', 'RDD', 'R', 'GDD', 'RUUUU', 'RDDDD', 'K')
+ParsedNamespace(G, M, c, gDD, r, theta, gdet, epsilonUUUU, gUU, GammaUDD, RUDDD, RUUUU, RDDDD, K)
 >>> from sympy import simplify
 >>> print(simplify(K))
 48*G**2*M**2/(c**4*r**6)
@@ -62,7 +62,7 @@ In [2]: %%parse_latex
     ...:         + \Gamma^\alpha_{\mu \gamma} \Gamma^\gamma_{\beta \nu} - \Gamma^\alpha_{\nu \sigma} \Gamma^\sigma_{\beta \mu} \\
     ...:     K &= R^{\alpha \beta \mu \nu} R_{\alpha \beta \mu \nu}
     ...: \end{align}
-Out[2]: ('G', 'M', 'c', 'gDD', 'r', 'theta', 'epsilonUUUU', 'gdet', 'gUU', 'GammaUDD', 'RUDDD', 'RDD', 'R', 'GDD', 'RUUUU', 'RDDDD', 'K')
+Out[2]: ParsedNamespace(G, M, c, gDD, r, theta, gdet, epsilonUUUU, gUU, GammaUDD, RUDDD, RUUUU, RDDDD, K)
 In [3]: from sympy import simplify
 In [4]: print(simplify(K))
 Out[4]: 48*G**2*M**2/(c**4*r**6)

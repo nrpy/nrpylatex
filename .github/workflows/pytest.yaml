@@ -54,9 +54,10 @@ jobs:
       - name: Run NRPyLaTeX Unit Tests
         run: uv run --no-sync pytest -s
       - name: Run NRPy BSSN Unit Tests
-        run: >-
-          uv run --no-sync pytest -s
-          --pyargs nrpy.equations.general_relativity.nrpylatex.test_parse_BSSN
+        run: uv run --no-sync python -m nrpy.equations.general_relativity.nrpylatex.test_parse_BSSN
+        # run: >-
+        #   uv run --no-sync pytest -s
+        #   --pyargs nrpy.equations.general_relativity.nrpylatex.test_parse_BSSN
 
   sympy-dev:
     runs-on: ubuntu-latest
